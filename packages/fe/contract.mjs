@@ -70,6 +70,24 @@ export const CONTRACT_DIR_RELATIVE = "src/components/contracts"
  */
 export const CONTRACT_TABLE_RELATIVE = `${CONTRACT_DIR_RELATIVE}/index.ts`
 
+/**
+ * Where to tell THIS file's author the table is.
+ *
+ * `CONTRACT_TABLE_RELATIVE` is the single-app spelling, and a message is the one place a hardcoded
+ * prefix survives a monorepo without turning anything red: no predicate reads it, so nothing fails —
+ * the author is simply sent to a path their repository does not have, and the rule looks wrong rather
+ * than the message. Resolve it from the linted file instead, off the same closed list every predicate
+ * here already walks.
+ *
+ * @param filename - the file being linted.
+ * @returns the entry table as it is spelled in that file's layout.
+ */
+export const contractTableFor = (filename) => {
+    const path = normalizePath(filename || "")
+    const root = COMPONENT_ROOTS.find((candidate) => path.includes(`/${candidate}/`))
+    return root ? `${root}/contracts/index.ts` : CONTRACT_TABLE_RELATIVE
+}
+
 /** The one component that turns an entry into a real element. */
 export const CONTRACT_FRAME_RELATIVE = "src/components/branches/Tree"
 
@@ -579,7 +597,7 @@ export const noLiteralStructuralClass = {
         const text = staticAttributeText(node)
         if (!text) return
         const hit = structuralToken(text)
-        if (hit) context.report({ node, messageId: "structural", data: { cls: hit, table: CONTRACT_TABLE_RELATIVE } })
+        if (hit) context.report({ node, messageId: "structural", data: { cls: hit, table: contractTableFor(context.filename) } })
       },
       // A class string lifted into a module constant is the same decision one line further up, and
       // it is INVISIBLE to the arm above - this is not hypothetical, it is how an off-scale `py-1.5`
@@ -704,13 +722,13 @@ export const noStructuralHostOutsideContractFrame = {
         const tag = hostName(node)
         if (!tag) return
         if (NEUTRAL_HOSTS.has(tag)) {
-          context.report({ node, messageId: "host", data: { tag, table: CONTRACT_TABLE_RELATIVE } })
+          context.report({ node, messageId: "host", data: { tag, table: contractTableFor(context.filename) } })
           return
         }
         if (!SEMANTIC_HOSTS.has(tag)) return
         // A semantic element decides no shape until it carries one.
         const styled = (node.attributes || []).some((attr) => isClassAttribute(attr))
-        if (styled) context.report({ node, messageId: "styledSemantic", data: { tag, table: CONTRACT_TABLE_RELATIVE } })
+        if (styled) context.report({ node, messageId: "styledSemantic", data: { tag, table: contractTableFor(context.filename) } })
       },
     }
   },
