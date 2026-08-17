@@ -68,3 +68,13 @@ Same shape as cause 2, and the same two ways out.
 Causes 2 and 3 are couplings this package inherited from living inside the trust tree; deciding where
 those checks belong changes the tree, not the package. Cause 1 is a canon question about rule ownership.
 The tests stay red so that all three keep asking.
+
+## `no-shell-tier` is held back from `@starci/eslint-canon-fe`
+
+Ported nothing: the rule bans a `shells/` tier outright, while this package's own
+`file-layout.mjs` lists `shells` among the vocabulary tiers a shared package may hold. Two rules in
+one plugin cannot disagree about whether a tier exists, and the trust tree names `shells` exactly once
+— in a template enumeration — which is too thin to settle it.
+
+Blocked on the law, not on the code: `compilers/patterns/fe/file-layout` has to say whether a
+`shells/` folder is a tier. Whichever way it rules, one of these two has to change.
