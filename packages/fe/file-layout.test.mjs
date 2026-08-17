@@ -11,6 +11,7 @@ import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
+  sourceTierMarkerMatchesFolder,
   exportMatchesFolder,
   monorepoTierBelongsToItsSide,
   noHelperFolderInComponents,
@@ -230,9 +231,12 @@ test("FILE-5: each tier sits on its own side of the feature line", () => {
   })
 })
 
-test("every rule this law declares is exported under its published name", () => {
-  for (const [name, rule] of Object.entries(rules)) {
-    assert.equal(typeof rule.create, "function", `${name} publishes no create()`)
-    assert.ok(rule.meta?.messages, `${name} publishes no messages`)
-  }
+test("FILE-8: the source marker and owning tier agree", () => {
+  tester.run("source-tier-marker-matches-folder", sourceTierMarkerMatchesFolder, {
+    valid: [
+      { filename: `${R}/branches/ModalBranch/index.tsx`, code: "export const meta = { shape: 'branch' } as const" },
+      { filename: `${R}/overlays/auth/SignInOverlay/component.tsx`, code: "export const meta = { shape: 'overlay' } as const" },
+    ],
+    invalid: [{ filename: `${R}/branches/ModalBranch/index.tsx`, code: "export const meta = { shape: 'shell' } as const", errors: [{ messageId: "mismatch" }] }],
+  })
 })

@@ -13,6 +13,10 @@ import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
   noChildrenSlot,
+  noCssDoorTypeLaundering,
+  noPerPartClassNameProp,
+  noPublicClassNameProp,
+  noPublicFrameCssProps,
   noInlineParameterType,
   noSurfaceListItemsSlot,
   rules,
@@ -151,5 +155,31 @@ test("SLOTS-4: framework layouts close ReactNode before the component tier", () 
         errors: 1,
       },
     ],
+  })
+})
+
+test("SLOTS-5/6: public CSS doors stay closed at declarations, call sites and utility types", () => {
+  tester.run("no-per-part-classname-prop", noPerPartClassNameProp, {
+    valid: [{ filename: BRANCH, code: "type P = { tone: 'quiet' | 'loud' }" }],
+    invalid: [{ filename: BRANCH, code: "type P = { titleClassName?: string }", errors: [{ messageId: "perPart" }] }],
+  })
+  tester.run("no-public-classname-prop", noPublicClassNameProp, {
+    valid: [{ filename: BRANCH, code: "type P = { tone: 'quiet' | 'loud' }" }],
+    invalid: [
+      { filename: BRANCH, code: "type P = { className?: string }", errors: [{ messageId: "declaration" }] },
+      {
+        filename: "/repo/src/components/blocks/X/component.tsx",
+        code: "import { SurfaceCard } from '@/components/branches/SurfaceCard'; const X = () => <SurfaceCard className='p-2' />",
+        errors: [{ messageId: "usage" }],
+      },
+    ],
+  })
+  tester.run("no-public-frame-css-props", noPublicFrameCssProps, {
+    valid: [{ filename: "/repo/src/components/leaves/Stack/index.tsx", code: "type P = { gap?: string }" }],
+    invalid: [{ filename: BRANCH, code: "type P = { gap?: string }", errors: [{ messageId: "css" }] }],
+  })
+  tester.run("no-css-door-type-laundering", noCssDoorTypeLaundering, {
+    valid: [{ filename: BRANCH, code: "type P = Pick<Base, 'tone'>" }],
+    invalid: [{ filename: BRANCH, code: "type P = Omit<Base, 'className'>", errors: [{ messageId: "utility" }] }],
   })
 })

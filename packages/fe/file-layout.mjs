@@ -290,7 +290,61 @@ export const routeTreeHoldsRoutesOnly = {
 }
 
 /** The rules this law contributes to the plugin. */
+const TIER_PATH = /\/(?:src\/components|packages\/[^/]+\/src|apps\/[^/]+\/src\/(?:components\/)?)\/(leaves|composites|branches|blocks|layouts|overlays|pages)\//
+
+function propertyName(node) {
+  if (node.key?.type === "Identifier") return node.key.name
+  if (node.key?.type === "Literal") return node.key.value
+  return null
+}
+
+/** `meta.shape` must tell the same truth as the source path. */
+export const sourceTierMarkerMatchesFolder = {
+  meta: {
+    type: "problem",
+    docs: { description: "A source tier marker matches the component folder that owns it." },
+    schema: [],
+    messages: {
+      mismatch:
+        "This file sits in `{{tier}}/` but declares `meta.shape = {{shape}}`. A source marker is evidence, not a second classification; change the owner or the marker so the path and source agree.",
+    },
+  },
+  create(context) {
+    const hit = normalizePath(context.filename || context.getFilename()).match(TIER_PATH)
+    if (!hit) return {}
+    const expected = {
+      blocks: "block",
+      branches: "branch",
+      composites: "composite",
+      contracts: "contract",
+      layouts: "layout",
+      leaves: "leaf",
+      overlays: "overlay",
+      pages: "page",
+    }[hit[1]]
+    return {
+      ExportNamedDeclaration(node) {
+        const declaration = node.declaration
+        if (!declaration || declaration.type !== "VariableDeclaration") return
+        for (const item of declaration.declarations || []) {
+          if (item.id?.type !== "Identifier" || item.id.name !== "meta") continue
+          let init = item.init
+          while (init && (init.type === "TSAsExpression" || init.type === "TSSatisfiesExpression")) init = init.expression
+          if (!init || init.type !== "ObjectExpression") continue
+          const shapeProperty = init.properties.find((property) =>
+            property.type === "Property" && !property.computed && propertyName(property) === "shape")
+          const shape = shapeProperty?.value?.type === "Literal" ? shapeProperty.value.value : null
+          if (typeof shape === "string" && shape !== expected) {
+            context.report({ node: shapeProperty.value, messageId: "mismatch", data: { tier: hit[1], shape } })
+          }
+        }
+      },
+    }
+  },
+}
+
 export const rules = {
+  "source-tier-marker-matches-folder": sourceTierMarkerMatchesFolder,
   "surface-folder-two-files-only": surfaceFolderTwoFilesOnly,
   "route-tree-holds-routes-only": routeTreeHoldsRoutesOnly,
   "no-helper-folder-in-components": noHelperFolderInComponents,

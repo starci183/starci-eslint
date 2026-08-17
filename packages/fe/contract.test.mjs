@@ -17,6 +17,7 @@ import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
+  contractChildrenAreTyped,
   noInteractionClassInEntry,
   contractWhyIsAReason,
   noClassCompositionOutsideContract,
@@ -668,3 +669,19 @@ test("a table that cannot be read silences the rule instead of failing every cal
     invalid: [],
   })
 })
+
+test("CONTRACT-14: every entry declares a closed typed child grammar", () => {
+  tester.run("contract-children-are-typed", contractChildrenAreTyped, {
+    valid: [
+      { filename: TABLE, code: contractTable('    "empty-column": { classes: ["flex"], children: {}, why: "..." },') },
+      { filename: TABLE, code: contractTable('    "title-row": { classes: ["flex"], children: { title: { leaf: "text" }, fact: { contract: "fact" } }, why: "..." },') },
+      { filename: TABLE, code: contractTable('    "content-row": { classes: ["flex"], children: { body: { leaf: "text", contract: "detail-row" } }, why: "..." },') },
+    ],
+    invalid: [
+      { filename: TABLE, code: contractTable('    "empty-column": { classes: ["flex"], why: "..." },'), errors: [{ messageId: "missing" }] },
+      { filename: TABLE, code: contractTable('    "title-row": { classes: ["flex"], children: { title: ReactNode }, why: "..." },'), errors: [{ messageId: "untyped" }] },
+      { filename: TABLE, code: contractTable('    "title-row": { classes: ["flex"], children: { title: { optional: true } }, why: "..." },'), errors: [{ messageId: "untyped" }] },
+    ],
+  })
+})
+
