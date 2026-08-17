@@ -164,7 +164,7 @@ export const noRuntimeNamespace = {
 const FEATURE_TIERS = /\/packages\/[^/]+\/src\/(blocks|overlays|pages|layouts)\//
 
 /** Tiers that know no feature, and therefore belong to the shared package. */
-const VOCABULARY_TIERS = /\/apps\/[^/]+\/src\/(?:components\/)?(contracts|leaves|composites|branches|shells)\//
+const VOCABULARY_TIERS = /\/apps\/[^/]+\/src\/(?:components\/)?(contracts|leaves|composites|branches)\//
 
 /**
  * In a monorepo, the shared package stops below the block.
@@ -183,7 +183,7 @@ export const monorepoTierBelongsToItsSide = {
     type: "problem",
     docs: {
       description:
-        "In a monorepo the shared package holds contracts, leaves, composites, branches and shells; blocks, overlays, layouts and pages belong to the app that owns the feature.",
+        "In a monorepo the shared package holds contracts, leaves, composites and branches; blocks, overlays, layouts and pages belong to the app that owns the feature.",
     },
     schema: [],
     messages: {
@@ -343,7 +343,27 @@ export const sourceTierMarkerMatchesFolder = {
   },
 }
 
+const SHELL_TIER = /\/(?:src\/components|packages\/[^/]+\/src|apps\/[^/]+\/src\/(?:components\/)?)\/shells\//
+
+/** `shells/` no longer exists; vendor mechanics are closed named branches. */
+export const noShellTier = {
+  meta: {
+    type: "problem",
+    docs: { description: "The component vocabulary has no shell tier." },
+    schema: [],
+    messages: {
+      shell:
+        "`shells/` is an untyped branch exemption. Move the owner to a named branch, replace children with typed contract content, and keep vendor mechanics closed there.",
+    },
+  },
+  create(context) {
+    if (!SHELL_TIER.test(normalizePath(context.filename || context.getFilename()))) return {}
+    return { Program(node) { context.report({ node, messageId: "shell" }) } }
+  },
+}
+
 export const rules = {
+  "no-shell-tier": noShellTier,
   "source-tier-marker-matches-folder": sourceTierMarkerMatchesFolder,
   "surface-folder-two-files-only": surfaceFolderTwoFilesOnly,
   "route-tree-holds-routes-only": routeTreeHoldsRoutesOnly,

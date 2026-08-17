@@ -11,6 +11,7 @@ import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
+  noShellTier,
   sourceTierMarkerMatchesFolder,
   exportMatchesFolder,
   monorepoTierBelongsToItsSide,
@@ -231,7 +232,7 @@ test("FILE-5: each tier sits on its own side of the feature line", () => {
   })
 })
 
-test("FILE-8: the source marker and owning tier agree", () => {
+test("FILE-7: the source marker and owning tier agree", () => {
   tester.run("source-tier-marker-matches-folder", sourceTierMarkerMatchesFolder, {
     valid: [
       { filename: `${R}/branches/ModalBranch/index.tsx`, code: "export const meta = { shape: 'branch' } as const" },
@@ -240,3 +241,12 @@ test("FILE-8: the source marker and owning tier agree", () => {
     invalid: [{ filename: `${R}/branches/ModalBranch/index.tsx`, code: "export const meta = { shape: 'shell' } as const", errors: [{ messageId: "mismatch" }] }],
   })
 })
+
+test("FILE-8: shells are branches with typed contracts, not a tier", () => {
+  tester.run("no-shell-tier", noShellTier, {
+    valid: [{ filename: `${R}/branches/ModalBranch/index.tsx`, code: "export const ModalBranch = () => null" }],
+    invalid: [{ filename: `${R}/shells/ModalShell/index.tsx`, code: "export const ModalShell = () => null", errors: [{ messageId: "shell" }] }],
+  })
+})
+
+
