@@ -14,7 +14,6 @@ import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
   e2eAssertsPersistedState,
-  e2eUsesProductionTransport,
   harnessCallsProviderDirectly,
   noCallOnlySpec,
   noModelCallInE2e,
@@ -132,35 +131,6 @@ test("TESTING-9: an e2e overrides the model with Jest; only the harness reaches 
         filename: E2E,
         code: "import { ModelsService } from '../helpers/models.service'",
         errors: [{ messageId: "provider" }],
-      },
-    ],
-  })
-})
-
-test("TESTING-3: an e2e enters through production transport", () => {
-  tester.run("e2e-uses-production-transport", e2eUsesProductionTransport, {
-    valid: [
-      { filename: E2E, code: "await request(app.getHttpServer()).post('/graphql').send({ query })" },
-      { filename: E2E, code: "socket.emit('join', { roomId })" },
-      { filename: E2E, code: "await entityManager.query('select 1')" },
-      { filename: UNIT, code: "await commandBus.execute(command)" },
-      { filename: E2E, code: "import { CqrsModule } from '@nestjs/cqrs'" },
-    ],
-    invalid: [
-      {
-        filename: E2E,
-        code: "import { CommandBus } from '@nestjs/cqrs'; await commandBus.execute(command)",
-        errors: [{ messageId: "busImport" }, { messageId: "direct" }],
-      },
-      {
-        filename: E2E,
-        code: "await handler.execute(command)",
-        errors: [{ messageId: "direct" }],
-      },
-      {
-        filename: E2E,
-        code: "await worker.process(job)",
-        errors: [{ messageId: "direct" }],
       },
     ],
   })

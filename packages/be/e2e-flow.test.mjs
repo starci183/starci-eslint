@@ -14,10 +14,8 @@ import { fileURLToPath } from "node:url"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
-  e2eAssertsPersistedState,
   e2eUsesProductionTransport,
   noBranchInFlowStep,
-  noModelCallInE2e,
   noSleepInFlow,
   rules,
 } from "./e2e-flow.mjs"
@@ -33,7 +31,7 @@ const tester = new RuleTester({
 const FLOW = "/repo/src/tests/e2e/course-purchase.e2e-spec.ts"
 const UNIT = "/repo/src/modules/billing/charge.spec.ts"
 
-test("operational E2E preserves transport, consequence and provider boundaries", () => {
+test("operational E2E preserves the production transport boundary", () => {
   tester.run("e2e-uses-production-transport", e2eUsesProductionTransport, {
     valid: [{ filename: FLOW, code: "await request(app).post('/graphql').send(body)" }],
     invalid: [{
@@ -45,14 +43,6 @@ test("operational E2E preserves transport, consequence and provider boundaries",
       code: "await enrollWorker.finalize(job)",
       errors: [{ messageId: "actor" }],
     }],
-  })
-  tester.run("e2e-asserts-persisted-state", e2eAssertsPersistedState, {
-    valid: [{ filename: FLOW, code: "await entityManager.findOne(Entity, {})" }],
-    invalid: [{ filename: FLOW, code: "expect(response.status).toBe(200)", errors: [{ messageId: "state" }] }],
-  })
-  tester.run("no-model-call-in-e2e", noModelCallInE2e, {
-    valid: [{ filename: FLOW, code: "jest.mock('@modules/ai/provider')" }],
-    invalid: [{ filename: FLOW, code: "import OpenAI from 'openai'", errors: [{ messageId: "provider" }] }],
   })
 })
 

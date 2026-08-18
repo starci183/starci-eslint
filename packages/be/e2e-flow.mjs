@@ -73,45 +73,6 @@ export const e2eUsesProductionTransport = {
   },
 }
 
-/** E2E reads the consequence from persistent state rather than only its response envelope. */
-export const e2eAssertsPersistedState = {
-  meta: {
-    type: "problem",
-    docs: { description: "E2E reads a persisted business consequence." },
-    schema: [],
-    messages: { state: "This E2E never reads persisted state back; an envelope alone is not a business consequence." },
-  },
-  create(context) {
-    if (!isE2eSpec(context.filename || context.getFilename())) return {}
-    let readsState = false
-    const readers = /^(?:entityManager|dataSource|EntityManager|DataSource|getRepository|queryRunner)$/
-    return {
-      Identifier(node) { if (readers.test(node.name)) readsState = true },
-      "Program:exit"(node) { if (!readsState) context.report({ node, messageId: "state" }) },
-    }
-  },
-}
-
-/** Model quality belongs in harness; E2E scripts only the provider boundary. */
-export const noModelCallInE2e = {
-  meta: {
-    type: "problem",
-    docs: { description: "E2E never reaches a paid or nondeterministic model provider." },
-    schema: [],
-    messages: { provider: "`{{source}}` reaches a model provider from E2E. Script the external result and keep internal policy real." },
-  },
-  create(context) {
-    if (!isE2eSpec(context.filename || context.getFilename())) return {}
-    const providers = /^(?:@anthropic-ai\/|openai$|openai\/|ollama$|@google\/generative-ai|@mistralai\/|cohere-ai)/
-    return {
-      ImportDeclaration(node) {
-        const source = node.source.value
-        if (typeof source === "string" && providers.test(source)) context.report({ node, messageId: "provider", data: { source } })
-      },
-    }
-  },
-}
-
 // -- E2E-3 ----------------------------------------------------------------------------------------
 
 /** A flow polls until the state settles; it never waits for a duration. */
@@ -198,8 +159,6 @@ export const noBranchInFlowStep = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "e2e-uses-production-transport": e2eUsesProductionTransport,
-  "e2e-asserts-persisted-state": e2eAssertsPersistedState,
-  "no-model-call-in-e2e": noModelCallInE2e,
   "no-sleep-in-flow": noSleepInFlow,
   "no-branch-in-flow-step": noBranchInFlowStep,
 }
