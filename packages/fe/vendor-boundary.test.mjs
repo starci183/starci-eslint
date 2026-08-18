@@ -290,6 +290,17 @@ test("VENDOR-12: the auth overlay has one zero-inset content host", () => {
         filename: "D:/repo/src/components/contracts/index.ts",
         code: "const C = { 'centred-page-column': { classes: ['flex', 'gap-6'] } }",
       },
+      // NEW SHAPE: ModalBranch/DrawerBranch migrated to take {contract, render} directly and
+      // build <Tree contract render /> internally - the overlay delegates the host to the branch.
+      {
+        filename: "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx",
+        code: "import { ModalBranch } from '@/components/branches/ModalBranch'; export const Overlay = ({ render, onDismiss }) => <ModalBranch isOpen contract={render.meta.contract} render={render} onDismiss={onDismiss} />",
+      },
+      // the same new shape through DrawerBranch, which carries the identical invariant
+      {
+        filename: "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx",
+        code: "import { DrawerBranch } from '@/components/branches/DrawerBranch'; export const Overlay = ({ render, onDismiss }) => <DrawerBranch isOpen title=\"Sign in\" contract={render.meta.contract} render={render} onDismiss={onDismiss} />",
+      },
     ],
     invalid: [
       {
@@ -307,6 +318,18 @@ test("VENDOR-12: the auth overlay has one zero-inset content host", () => {
         filename: "D:/repo/src/components/contracts/index.ts",
         code: "const C = { 'centred-page-column': { classes: ['flex', 'py-6'] } }",
         errors: [{ messageId: "inset" }],
+      },
+      // neither shape: no ContractContent import, and no branch invoked with both contract and render
+      {
+        filename: "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx",
+        code: "export const Overlay = ({ render }) => <div>{render.meta.contract}</div>",
+        errors: [{ messageId: "missing" }],
+      },
+      // the new shape still forbids a second host nested where the branch already owns one
+      {
+        filename: "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx",
+        code: "import { ModalBranch } from '@/components/branches/ModalBranch'; export const Overlay = ({ render, onDismiss }) => <ModalBranch isOpen contract={render.meta.contract} render={render} onDismiss={onDismiss}><ContractContent contract={render.meta.contract} render={render} /></ModalBranch>",
+        errors: [{ messageId: "duplicate" }],
       },
     ],
   })

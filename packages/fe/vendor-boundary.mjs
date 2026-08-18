@@ -440,11 +440,11 @@ export const noInternalStarciHref = {
 export const authOverlayOwnsSingleContentHost = {
   meta: {
     type: "problem",
-    docs: { description: "Authentication has one zero-inset content host inside ModalBranch." },
+    docs: { description: "Authentication has one zero-inset content host inside ModalBranch or DrawerBranch." },
     schema: [],
     messages: {
-      duplicate: "SignInOverlay must project with `ContractContent`, not open another `Tree` around a panel that already owns the same host.",
-      missing: "SignInOverlay must import `ContractContent` for its already-hosted projection.",
+      duplicate: "SignInOverlay must project through one host only: do not open a second `Tree`/`ContractContent` inside a branch that already receives `contract`/`render` directly, and do not open `Tree` by hand instead of importing `ContractContent`.",
+      missing: "SignInOverlay must host its content either by importing `ContractContent` for its already-hosted projection, or by passing `contract` and `render` props directly to `ModalBranch`/`DrawerBranch`.",
       inset: "`centred-page-column` must not add py/pt/pb. ModalBranch is zero-inset and the auth content touches that scroll region without a second vertical padding band.",
     },
   },
@@ -454,23 +454,62 @@ export const authOverlayOwnsSingleContentHost = {
     const isContracts = /\/src\/components\/contracts\/index\.ts$/.test(file)
     if (!isOverlay && !isContracts) return {}
     let hasContent = false
+
+    /*
+     * Two call shapes satisfy the same invariant - one contract-driven content host, zero extra
+     * vertical inset - and both are recognised here.
+     *
+     * (a) THE OLD SHAPE: the overlay imports `ContractContent` and mounts it itself as the branch's
+     * children. `ContractContent` IS the checked host, so importing it is enough to credit the
+     * overlay with owning one.
+     *
+     * (b) THE NEW SHAPE: `ModalBranch`/`DrawerBranch` were migrated to take `{contract, render}`
+     * directly and build `<Tree contract render />` internally (SLOTS-4). An overlay that hands both
+     * props straight to the branch has delegated the same host to the branch itself; there is
+     * nothing left for the overlay to import.
+     *
+     * Matched by JSX ATTRIBUTE NAME, not by where `ModalBranch`/`DrawerBranch` resolve from - same
+     * reasoning VENDOR-12 already applies to `ContractContent`/`Tree` below: canon vocabulary means
+     * the same thing wherever it is imported from.
+     */
+    const MECHANICS_BRANCH_NAMES = new Set(["ModalBranch", "DrawerBranch"])
+    const hasJsxAttribute = (attributes, attrName) =>
+      (attributes || []).some((attribute) =>
+        attribute.type === "JSXAttribute"
+        && attribute.name?.type === "JSXIdentifier"
+        && attribute.name.name === attrName)
+    const jsxChildName = (child) => {
+      if (child?.type !== "JSXElement") return null
+      const name = child.openingElement?.name
+      return name?.type === "JSXIdentifier" ? name.name : null
+    }
+
     return {
       ImportDeclaration(node) {
         if (!isOverlay) return
         /*
-         * Matched by the NAME imported, not by where it came from.
-         *
-         * The path test this replaced only recognised `components/branches/Tree`,
-         * which is the single-app layout. A workspace that publishes the same
-         * branches from a package satisfied the law and failed the rule, with
-         * the only available remedy being an import of a module that does not
-         * exist there. `ContractContent` and `Tree` are canon vocabulary: a file
-         * importing either means the same thing wherever it resolves from.
+         * Matched by the NAME imported, not by where it came from - see the comment above.
          */
         for (const specifier of node.specifiers || []) {
           if (specifier.imported?.name === "ContractContent") hasContent = true
+          // Opening `Tree` by hand is the one thing neither shape ever does: both shapes close the
+          // host either inside ContractContent or inside the mechanics branch itself.
           if (specifier.imported?.name === "Tree") context.report({ node: specifier, messageId: "duplicate" })
         }
+      },
+      JSXElement(node) {
+        if (!isOverlay) return
+        const name = node.openingElement?.name
+        if (name?.type !== "JSXIdentifier" || !MECHANICS_BRANCH_NAMES.has(name.name)) return
+        const attributes = node.openingElement.attributes
+        if (!hasJsxAttribute(attributes, "contract") || !hasJsxAttribute(attributes, "render")) return
+        // The branch itself now owns the host: shape (b).
+        hasContent = true
+        // A second content host nested as children, when the branch already receives contract/render
+        // directly, duplicates the host the branch already opened.
+        const nestedHost = (node.children || []).some((child) =>
+          jsxChildName(child) === "Tree" || jsxChildName(child) === "ContractContent")
+        if (nestedHost) context.report({ node, messageId: "duplicate" })
       },
       Property(node) {
         if (!isContracts) return
