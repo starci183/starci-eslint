@@ -86,6 +86,69 @@ const isGoverned = (filename) => {
 }
 
 /**
+ * True when a function's whole body does nothing but turn `children` into a component
+ * reference and hand that reference to exactly one other component under a named prop.
+ *
+ * THIS IS SLOTS-4'S OWN EXCEPTION, READ FROM SHAPE, NOT FROM A NAME. The rule's message
+ * already promises it: a framework route layout may receive `ReactNode` outside the
+ * component tier, but must close it into a named projection before a component sees it.
+ * A shell that crosses `children` over a client/server boundary - wrapping it in
+ * `useCallback` so it survives as a function reference rather than an unserialisable
+ * inline component - IS that closing act; there is no contract key to name because the
+ * shell is deliberately generic across callers. What makes the exception SAFE to keep
+ * narrow is that the shape disqualifies itself the moment the body does one more thing:
+ * a second return, a conditional, a data read, an element of its own, or a forwarded
+ * value that never passes through the closure all fall through to the ordinary report.
+ *
+ * - Every statement but the last is a `const x = ...` naming either a plain member/param
+ *   read (`const Frame = input.frame`) or a `useCallback(...)` call - nothing else.
+ * - The last statement is the only `return`, and it returns exactly one JSX element.
+ * - That element's attributes only spread or forward existing bindings, and at least one
+ *   of them carries the `useCallback` result - the children-derived reference - by name.
+ */
+const isChildrenBoundaryConverter = (fn) => {
+  if (!fn || fn.body?.type !== "BlockStatement") return false
+  const statements = fn.body.body
+  let closureVar = null
+  let returnNode = null
+
+  for (const statement of statements) {
+    if (statement.type === "ReturnStatement") {
+      if (returnNode) return false // a second return means this does more than one thing
+      returnNode = statement.argument
+      continue
+    }
+    if (statement.type !== "VariableDeclaration" || statement.declarations.length !== 1) return false
+    const [declarator] = statement.declarations
+    const init = declarator.init
+    if (declarator.id.type !== "Identifier" || !init) return false
+    if (init.type === "MemberExpression" || init.type === "Identifier") continue // a plain prop read
+    if (init.type === "CallExpression" && init.callee?.type === "Identifier" && init.callee.name === "useCallback") {
+      const callback = init.arguments[0]
+      if (!callback || (callback.type !== "ArrowFunctionExpression" && callback.type !== "FunctionExpression")) {
+        return false
+      }
+      closureVar = declarator.id.name
+      continue
+    }
+    return false // any other statement is the component doing something of its own
+  }
+
+  if (!closureVar || !returnNode || returnNode.type !== "JSXElement") return false
+
+  let carriesClosure = false
+  for (const attribute of returnNode.openingElement.attributes || []) {
+    if (attribute.type === "JSXSpreadAttribute") continue
+    if (attribute.type !== "JSXAttribute" || !attribute.value) return false
+    const raw = attribute.value.type === "JSXExpressionContainer" ? attribute.value.expression : attribute.value
+    const value = raw?.type === "TSAsExpression" ? raw.expression : raw
+    if (value?.type !== "Identifier") return false
+    if (value.name === closureVar) carriesClosure = true
+  }
+  return carriesClosure
+}
+
+/**
  * A container takes `contract` and `render`, never `children`.
  *
  * THE TYPE CANNOT CATCH THIS ONE, which is why it is here. `props.ts` refuses a fourth slot on the
@@ -95,6 +158,12 @@ const isGoverned = (filename) => {
  * Vendor mechanics branches still take a named contract/render projection. Framework route
  * layouts sit outside the component tier and close their ReactNode into that projection before it
  * reaches a component.
+ *
+ * ONE CLOSED EXCEPTION LIVES INSIDE THE COMPONENT TIER: a boundary-converter shell whose
+ * whole body matches {@link isChildrenBoundaryConverter}. It is closed by shape, checked
+ * against the actual function the props type belongs to, never by filename or export name
+ * - so nothing can opt in by being called `RouteShell`, and nothing loses the exemption by
+ * being renamed.
  */
 export const noChildrenSlot = {
   meta: {
@@ -108,10 +177,43 @@ export const noChildrenSlot = {
   },
   create(context) {
     if (!isGoverned(context.filename || context.getFilename())) return {}
+
+    // Deferred to Program:exit so the boundary-converter exemption - which has to look at
+    // the whole file to find the function a props type belongs to - can clear a candidate
+    // before it is ever reported.
+    const candidates = []
+    const componentsByPropsType = new Map()
+
+    const enclosingFunction = (node) => {
+      for (let current = node.parent; current; current = current.parent) {
+        if (["ArrowFunctionExpression", "FunctionExpression", "FunctionDeclaration"].includes(current.type)) {
+          return current
+        }
+      }
+      return null
+    }
+
+    const enclosingTypeName = (node) => {
+      for (let current = node.parent; current; current = current.parent) {
+        if (current.type === "TSInterfaceDeclaration" || current.type === "TSTypeAliasDeclaration") {
+          return current.id?.name || null
+        }
+      }
+      return null
+    }
+
+    /** The name of the type a function's single parameter is annotated with, if any. */
+    const parameterTypeName = (fn) => {
+      const annotation = fn.params?.[0]?.typeAnnotation?.typeAnnotation
+      return annotation?.type === "TSTypeReference" && annotation.typeName?.type === "Identifier"
+        ? annotation.typeName.name
+        : null
+    }
+
     return {
       TSPropertySignature(node) {
         if (node.key && node.key.type === "Identifier" && node.key.name === "children") {
-          context.report({ node: node.key, messageId: "slot" })
+          candidates.push({ node: node.key, typeName: enclosingTypeName(node) })
         }
       },
       Property(node) {
@@ -119,7 +221,18 @@ export const noChildrenSlot = {
         if (node.parent && node.parent.type !== "ObjectPattern") return
         if (node.parent.parent && node.parent.parent.type === "VariableDeclarator") return
         if (node.key && node.key.type === "Identifier" && node.key.name === "children") {
-          context.report({ node: node.key, messageId: "slot" })
+          candidates.push({ node: node.key, fn: enclosingFunction(node) })
+        }
+      },
+      ":function"(fn) {
+        const typeName = parameterTypeName(fn)
+        if (typeName) componentsByPropsType.set(typeName, fn)
+      },
+      "Program:exit"() {
+        for (const candidate of candidates) {
+          const fn = candidate.fn || (candidate.typeName && componentsByPropsType.get(candidate.typeName))
+          if (fn && isChildrenBoundaryConverter(fn)) continue
+          context.report({ node: candidate.node, messageId: "slot" })
         }
       },
     }

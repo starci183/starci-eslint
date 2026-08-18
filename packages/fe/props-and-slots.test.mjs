@@ -158,6 +158,76 @@ test("SLOTS-4: framework layouts close ReactNode before the component tier", () 
   })
 })
 
+test("SLOTS-4: a boundary-converter shell inside the component tier is exempt by shape, not by name", () => {
+  const ROUTE_SHELL = "/repo/src/components/route/RouteShell/index.tsx"
+  tester.run("no-children-slot", rules["no-children-slot"], {
+    valid: [
+      {
+        // RouteShell's ENTIRE job: close a routed page's children into a component
+        // reference (useCallback, so it survives the client/server boundary as a
+        // function rather than an unserialisable inline component) and hand that
+        // reference to the one other component it wraps, under a named prop. It
+        // cannot name one contract key - it is reused across every route - so this is
+        // the exception SLOTS-4's own message already promises, read from shape.
+        filename: ROUTE_SHELL,
+        code: `
+          export interface RouteShellProps<P extends RouteFrameProps> {
+            readonly children: ReactNode
+            readonly frame: ComponentType<P>
+            readonly props: Omit<P, "surface">
+          }
+          export const RouteShell = (input: RouteShellProps<P>) => {
+            const children = input.children
+            const Surface = useCallback(() => <>{children}</>, [children])
+            const Frame = input.frame
+            return <Frame {...(input.props)} surface={Surface} />
+          }
+        `,
+      },
+      {
+        // The destructured door into the same shape, still nothing but the handoff.
+        filename: ROUTE_SHELL,
+        code: `
+          export const RouteShell = ({ children, frame: Frame }: RouteShellProps) => {
+            const Surface = useCallback(() => <>{children}</>, [children])
+            return <Frame surface={Surface} />
+          }
+        `,
+      },
+    ],
+    invalid: [
+      {
+        // Same handoff, but it also decides something - a real conditional makes this
+        // a layout with a children hole, which is exactly what SLOTS-4 exists to catch.
+        // Renaming this file to RouteShell would not make it pass: the exemption reads
+        // the function body, not the filename.
+        filename: ROUTE_SHELL,
+        code: `
+          export interface RouteShellProps {
+            readonly children: ReactNode
+          }
+          export const RouteShell = (input: RouteShellProps) => {
+            const children = input.children
+            const Surface = useCallback(() => <>{children}</>, [children])
+            if (input.variant === "modal") {
+              return <ModalFrame surface={Surface} />
+            }
+            return <PageFrame surface={Surface} />
+          }
+        `,
+        errors: [{ messageId: "slot" }],
+      },
+      {
+        // Forwards `children` directly, with no closure and no other component to
+        // hand it to - a plain children hole, not a boundary conversion.
+        filename: ROUTE_SHELL,
+        code: "export const Fwd = ({ children }: FwdProps) => <div className='wrap'>{children}</div>",
+        errors: [{ messageId: "slot" }],
+      },
+    ],
+  })
+})
+
 test("SLOTS-5/6: public CSS doors stay closed at declarations, call sites and utility types", () => {
   tester.run("no-per-part-classname-prop", noPerPartClassNameProp, {
     valid: [{ filename: BRANCH, code: "type P = { tone: 'quiet' | 'loud' }" }],
