@@ -1,7 +1,7 @@
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { restDoorNeedsAReason, doorLivesInFeatures } from "./transport.mjs"
+import { restDoorNeedsAReason, doorLivesInFeatures, noCapabilityImportsFeatures } from "./transport.mjs"
 
 const tester = new RuleTester({
   languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
@@ -83,6 +83,36 @@ test("a door lives under features, whatever its transport", () => {
         filename: "D:/repo/src/modules/bussiness/theme/theme.controller.ts",
         code: '@Controller("api/theme") class X {}',
         errors: [{ messageId: "wrongTree" }],
+      },
+    ],
+  })
+})
+
+const CAPABILITY = "D:/repo/src/modules/bussiness/theme/build-theme.ts"
+
+test("a capability under modules/ never imports back into features/", () => {
+  tester.run("no-capability-imports-features", noCapabilityImportsFeatures, {
+    valid: [
+      // a capability calling another capability is the whole shape of modules/
+      { filename: CAPABILITY, code: 'import { AiService } from "@modules/ai"' },
+      // relative, inside the same capability
+      { filename: CAPABILITY, code: 'import { helper } from "./helpers"' },
+      // a door importing a capability is the sanctioned direction, and not this rule's business
+      { filename: DOOR, code: 'import { ThemeService } from "@modules/bussiness/theme"' },
+      // this rule is scoped to files under modules/, not to what a door imports
+      { filename: DOOR, code: 'import { X } from "@features/api/core/graphql/other/other.resolver"' },
+    ],
+    invalid: [
+      {
+        filename: CAPABILITY,
+        code: 'import { ThemeResolver } from "@features/api/core/graphql/theme/theme.resolver"',
+        errors: [{ messageId: "reversed" }],
+      },
+      {
+        // no alias, but the path still climbs into features/
+        filename: CAPABILITY,
+        code: 'import { X } from "../../../features/api/core/graphql/theme/theme.resolver"',
+        errors: [{ messageId: "reversed" }],
       },
     ],
   })

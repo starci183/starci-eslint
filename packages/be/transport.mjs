@@ -92,12 +92,77 @@ export const doorLivesInFeatures = {
   },
 }
 
+/** An import specifier's alias prefix for a door. */
+const FEATURES_ALIAS = "@features/"
+
+/** A relative or deep specifier climbing into `features/`, once the alias form is ruled out. */
+const FEATURES_SEGMENT = /(^|\/)features\//
+
+/** Whether an import specifier reaches into `features/`, by alias or by path. */
+const reachesFeatures = (specifier) => {
+  if (typeof specifier !== "string") return false
+  if (specifier.startsWith(FEATURES_ALIAS)) return true
+  return FEATURES_SEGMENT.test(specifier)
+}
+
+/**
+ * Rule 6: "A capability stays under `modules/` and is called by a door, never reached directly."
+ * A door under `features/` importing a capability under `modules/` is the entire shape TRANSPORT-3
+ * sets up, and this rule is not that edge - it fires only the other way: a file living under
+ * `modules/` reaching back into `features/`. That reversal makes the capability the caller and the
+ * door the thing being reached, which is backwards from what a capability is - it is CALLED, and it
+ * stays ignorant of who calls it. One capability importing another capability under `modules/` is
+ * untouched here; this rule polices one edge, not the whole graph.
+ */
+export const noCapabilityImportsFeatures = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "TRANSPORT Rule 6: a capability under modules/ never imports from features/ - a door calls into a capability, never the other way round.",
+    },
+    schema: [],
+    messages: {
+      reversed:
+        "`{{specifier}}` reaches from a capability under modules/ into features/, where doors live. A capability is CALLED by a door and stays ignorant of who calls it; importing back into features/ makes the capability the caller, which is the exact edge this law forbids. Move the shared code under modules/, or invert the call so the door reaches in.",
+    },
+  },
+  create(context) {
+    const path = normalize(context.filename || context.getFilename())
+    if (!/\/src\/modules\//.test(path)) return {}
+    const check = (node, specifier) => {
+      if (reachesFeatures(specifier)) context.report({ node, messageId: "reversed", data: { specifier } })
+    }
+    return {
+      ImportDeclaration(node) {
+        check(node.source, node.source.value)
+      },
+      ExportNamedDeclaration(node) {
+        if (node.source) check(node.source, node.source.value)
+      },
+      ExportAllDeclaration(node) {
+        if (node.source) check(node.source, node.source.value)
+      },
+    }
+  },
+}
+
 export const rules = {
   "rest-door-needs-a-reason": restDoorNeedsAReason,
   "door-lives-in-features": doorLivesInFeatures,
+  "no-capability-imports-features": noCapabilityImportsFeatures,
 }
 
+/**
+ * `no-capability-imports-features` measures at 9 offenders across 6 files in the reference
+ * repository (`src/**`, probed against source directly since the published package predates this
+ * rule) -- every one a capability under `modules/bussiness/**` importing a single shared helper
+ * published under `@features/api/processors/ai/shared/xp/write-coin-history`. That is standing debt,
+ * not zero, so it ships at `warn` with the count on record, matching this module's own Exceptions
+ * section: measured debt arrives at `warn` and flips to `error` once it reaches zero.
+ */
 export const recommended = {
   "starci-be/rest-door-needs-a-reason": "error",
   "starci-be/door-lives-in-features": "error",
+  "starci-be/no-capability-imports-features": "warn",
 }

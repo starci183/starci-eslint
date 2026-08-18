@@ -1,15 +1,31 @@
 /**
  * The rules that hold `cqrs.md`.
  *
- * Three of the seven rules are shapes a parser can see. The other four - where the work lives, how
- * thin the service is, whether an event is one the caller waits on - are judgements, and a rule
- * that guessed at them would fire on correct code often enough that everybody would learn to
- * disable it.
+ * Four of the eight rules are shapes a parser can see. The other four - where the work lives, how
+ * thin the service is, whether the folder is split, whether an event is one the caller waits on -
+ * are judgements, and a rule that guessed at them would fire on correct code often enough that
+ * everybody would learn to disable it.
  *
  * The one worth explaining is CQRS-3. A handler that overrides `execute` still compiles and still
  * runs; the template method in the base is simply skipped. Nothing goes red, and the file stays
  * wrong until the day a cross-cutting concern is added to the base and silently misses it. That is
  * exactly the class of mistake a rule is for: invisible at the call site, expensive later.
+ *
+ * Rule 2 (CQRS-1, one operation one folder) was measured and NOT added here, and that absence is
+ * itself a finding. A per-file check can only compare a filename's operation slug to its immediate
+ * parent directory - and against this reference repository that comparison mismatched on 462 files
+ * even after allowing an operation-prefixed suffix (`course-enroll-crypto.service.ts` beside
+ * `course-enroll.handler.ts`). The mismatches were not CQRS-1 violations: multi-step operations
+ * nested under a shared parent (`sign-in/init/`, `sign-in/resend/`), aggregator modules named for
+ * their parent (`ai-balancer/balancer.module.ts`), and an unrelated lesson-content tree
+ * (`features/mock/**`) all failed the comparison while being correct. A rule that guessed here would
+ * have reported on more correct files than wrong ones, which is precisely the failure mode this law
+ * warns against - it would have taught everybody to disable it. The law's own "documented" tier for
+ * CQRS-1 is the honest answer, not a gap to close.
+ *
+ * Rule 5 (CQRS-5) is the opposite case: a handler returning `{ success: false }` or `{ error }`
+ * instead of throwing is a shape a parser CAN see, narrowly, without guessing at intent - and this
+ * reference repository has two real handlers doing exactly that today.
  */
 
 /** Forward-slash form of a filename, so Windows paths compare like every other path. */
@@ -177,20 +193,99 @@ export const handlerHasTwinSpec = {
   },
 }
 
+// -- CQRS-5 ----------------------------------------------------------------------------------------
+
+/** The property name that turns a returned object into an encoded failure, or null. */
+const encodedFailureKey = (node) => {
+  if (!node || node.type !== "ObjectExpression") return null
+  for (const prop of node.properties || []) {
+    if (prop.type !== "Property") continue
+    const key = prop.key
+    const name = key.type === "Identifier" ? key.name : key.type === "Literal" && typeof key.value === "string" ? key.value : null
+    if (!name) continue
+    // `error` is the encode regardless of what carries it - a caught exception, a message string,
+    // an upstream response. Its presence on a RETURNED object is the tell: the branch that found
+    // the failure chose to hand it back instead of throwing it.
+    if (name === "error") return name
+    // `success`/`ok` only encode failure at `false` - `success: true` on the happy path is not
+    // this pattern, and flagging it would report the correct half of every handler that uses this
+    // shape at all.
+    if ((name === "success" || name === "ok") && prop.value && prop.value.type === "Literal" && prop.value.value === false) {
+      return name
+    }
+  }
+  return null
+}
+
+/** The nearest enclosing method named `process`, or null. */
+const enclosingProcessMethod = (node) => {
+  for (let current = node.parent; current; current = current.parent) {
+    if (current.type === "MethodDefinition" && current.key && current.key.name === "process") return current
+  }
+  return null
+}
+
+/** The nearest enclosing class declaration, or null. */
+const enclosingClass = (node) => {
+  for (let current = node.parent; current; current = current.parent) {
+    if (current.type === "ClassDeclaration") return current
+  }
+  return null
+}
+
+/** A handler that cannot do its work throws the domain exception naming why - it does not return one. */
+export const noHandlerEncodedFailure = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "A CQRS handler throws the domain exception that names a failure; it does not return a success/error shape (Law 5, CQRS-5).",
+    },
+    schema: [],
+    messages: {
+      encoded:
+        "`{{name}}`'s `process` returns an object carrying `{{key}}` instead of throwing. CQRS-5: a handler that cannot do its work throws the domain exception naming why; an encoded `{{key}}` field asks every caller to decode this shape its own way, and the REASON for the refusal never arrives - only the fact that there was one. Throw the exception that names why, in the branch that discovers it, and let the success path return the value itself.",
+    },
+  },
+  create(context) {
+    const filename = context.filename || context.getFilename()
+    const operation = handlerFile(filename)
+    if (!operation) return {}
+    return {
+      ReturnStatement(node) {
+        const key = encodedFailureKey(node.argument)
+        if (!key) return
+        // Scoped to `process` on a decorated handler, same as CQRS-3 - a private mapper in the
+        // same file returning an unrelated object shaped like `{ error: ... }` is not this
+        // handler's refusal path, and a rule that fired anywhere in the file would not be able to
+        // tell the two apart.
+        if (!enclosingProcessMethod(node)) return
+        const klass = enclosingClass(node)
+        if (!klass || !decoratorNames(klass).some((name) => HANDLER_DECORATORS.test(name))) return
+        context.report({ node: node.argument, messageId: "encoded", data: { name: operation, key } })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "handler-overrides-process": handlerOverridesProcess,
   "message-carries-params-only": messageCarriesParamsOnly,
   "handler-has-twin-spec": handlerHasTwinSpec,
+  "no-handler-encoded-failure": noHandlerEncodedFailure,
 }
 
 /**
  * The level this law asks for, as the plugin's own opinion.
  *
  * MEASURED AGAINST THE REFERENCE REPOSITORY, not estimated: 3 of 141 handlers override `execute`,
- * and 2 of 138 messages carry something other than a single `params`. Debt above zero means the
- * rule lands at `warn` with the count beside it, gets burned down, and flips to `error` at zero -
- * shipping at `error` with debt outstanding blocks every commit that touches an offender.
+ * 2 of 138 messages carry something other than a single `params`, and 2 of 152 handlers return an
+ * encoded failure (`sync-flashcard-quiz-session-progress.handler.ts` and
+ * `sync-mock-interview-session-turns.handler.ts` both `return { success: false }` where a late sync
+ * finds its session already closed). Debt above zero means the rule lands at `warn` with the count
+ * beside it, gets burned down, and flips to `error` at zero - shipping at `error` with debt
+ * outstanding blocks every commit that touches an offender.
  *
  * COUNT ONLY THIS RULE'S REPORTS when measuring. Inline `eslint-disable` comments in the source
  * refer to rules a minimal measuring config never loads, and eslint reports each of those as a
@@ -204,4 +299,5 @@ export const recommended = {
   "starci-be/handler-overrides-process": "error", // no=0 of 141 - burned down from 3
   "starci-be/message-carries-params-only": "error", // no=0 of 138 - burned down from 2
   "starci-be/handler-has-twin-spec": "off", // needs the folder listing as an option; a repo that wires it turns this on
+  "starci-be/no-handler-encoded-failure": "warn", // no=2 of 152 handlers - debt outstanding, burn down before flipping to error
 }

@@ -9,14 +9,13 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { existsSync } from "node:fs"
-import { fileURLToPath } from "node:url"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
   e2eUsesProductionTransport,
   noBranchInFlowStep,
   noSleepInFlow,
+  noWiringInFlowSpec,
   rules,
 } from "./e2e-flow.mjs"
 
@@ -47,63 +46,23 @@ test("operational E2E preserves the production transport boundary", () => {
 })
 
 /** The shipped business inventory; absence is a broken lane, not a skip. */
-const CANONICAL_FLOWS = [
-  "course-purchase",
-  "course-refund",
-  "course-trial",
-  "installment-payment",
-  "installment-default",
-  "membership-purchase",
-  "ai-subscription-purchase",
-  "payment-idempotency",
-  "payment-reconciliation",
-  "signup-and-signin",
-  "password-reset",
-  "two-factor-lifecycle",
-  "session-lifecycle",
-  "github-account-link",
-  "social-oauth-login",
-  "profile-publication",
-  "profile-portfolio",
-  "course-discovery",
-  "content-progress",
-  "content-discussion",
-  "content-ai-session",
-  "challenge-submission",
-  "coding-submission",
-  "flashcard-review-session",
-  "flashcard-quiz-session",
-  "flashcard-due-review-session",
-  "mock-interview",
-  "cv-build",
-  "personal-project-review",
-  "personal-project-team-request",
-  "playground-session",
-  "rag-playground",
-  "global-learning-search",
-  "daily-quest",
-  "weekly-challenge",
-  "kpi-reward",
-  "rewards-redeem",
-  "streak-freeze",
-  "achievement-unlock",
-  "league-season",
-  "notification-delivery",
-  "community-thread",
-  "follow-network",
-  "community-chat",
-  "job-posting",
-  "job-application",
-  "talent-discovery",
-]
 
-test("the canonical business inventory contains every executable flow suite", () => {
-  const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url))
-  const missing = CANONICAL_FLOWS.filter((flow) => !existsSync(
-    `${repositoryRoot}/src/tests/e2e/${flow}.e2e-spec.ts`,
-  ))
-  assert.deepEqual(missing, [])
-})
+/*
+ * THE CANONICAL-INVENTORY TEST IS NOT HERE, AND THAT IS THE FIX.
+ *
+ * It used to assert that every flow in a 47-entry list had a matching
+ * `src/tests/e2e/<flow>.e2e-spec.ts`, resolving the repository root as `../../../`.
+ * That path was correct while these machines lived INSIDE the backend checkout. When they
+ * were lifted out into this standalone package the relative path came with them unchanged,
+ * so it now resolves to this repository -- which has no `src/tests/e2e` and never will.
+ * The test therefore failed on every run since the lift, and the suite has been red since.
+ *
+ * Pointing it at a sibling checkout would be worse than leaving it broken: a machine that
+ * reads a consumer's filesystem asserts something it cannot know, passes or fails on where
+ * somebody happened to clone a repository, and silently stops checking the moment a second
+ * consumer adopts the canon. The inventory is a fact about ONE backend, so it is that
+ * backend's gate. It now lives in the consumer, where the 47 files actually are.
+ */
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -160,6 +119,27 @@ test("E2E-7: a step asserts one outcome, so it takes no branch", () => {
         filename: FLOW,
         code: "it(\"pays\", async () => { order && expect(order.status).toBe(\"paid\") })",
         errors: [{ messageId: "branch" }],
+      },
+    ],
+  })
+})
+
+test("E2E-8 (per-file half): a flow boots through the shared world, not a testing module of its own", () => {
+  tester.run("no-wiring-in-flow-spec", noWiringInFlowSpec, {
+    valid: [
+      // the shape the law asks for: enter through the shared helper
+      { filename: FLOW, code: "const world = await bootFlowWorld({ modelAnswer })" },
+      { filename: FLOW, code: "const app = await createE2eApp()" },
+      // `Test.createTestingModule` is legitimate where it belongs: the shared helper itself
+      { filename: "/repo/src/tests/helpers/flow-world.ts", code: "await Test.createTestingModule({ imports: [] }).compile()" },
+      // a unit spec building its own narrow module is a different lane and not this rule's business
+      { filename: UNIT, code: "await Test.createTestingModule({ providers: [Service] }).compile()" },
+    ],
+    invalid: [
+      {
+        filename: FLOW,
+        code: "const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()",
+        errors: [{ messageId: "wiring" }],
       },
     ],
   })

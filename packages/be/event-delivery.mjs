@@ -33,8 +33,61 @@ export const natsBridgeDeliveryContract = {
   },
 }
 
-export const rules = { "nats-bridge-delivery-contract": natsBridgeDeliveryContract }
+const isEmitCallOnEventEmitterService = (node) =>
+  node.callee.type === "MemberExpression" &&
+  !node.callee.computed &&
+  node.callee.property.type === "Identifier" &&
+  node.callee.property.name === "emit" &&
+  node.callee.object.type === "MemberExpression" &&
+  !node.callee.object.computed &&
+  node.callee.object.property.type === "Identifier" &&
+  node.callee.object.property.name === "eventEmitterService"
+
+const findObjectProperty = (objectExpression, name) => {
+  if (!objectExpression || objectExpression.type !== "ObjectExpression") return null
+  return objectExpression.properties.find(
+    (property) => property.type === "Property" &&
+      !property.computed &&
+      (property.key.name === name || property.key.value === name),
+  ) || null
+}
+
+/** DELIVERY Rule 2 (DELIVERY-2): transport is declared per event in one config, never at the call site. */
+export const noCallSiteTransportOverride = {
+  meta: {
+    type: "problem",
+    docs: {
+      description: "DELIVERY Rule 2 (DELIVERY-2): transport is declared per event in the central config; it is never chosen at the call site.",
+    },
+    schema: [],
+    messages: {
+      callsite: "DELIVERY Rule 2 (DELIVERY-2): do not pass `options.useLocal`/`options.useNats` to `eventEmitterService.emit(...)`. Transport is part of the event's definition in the central config, not a per-call decision -- a call site choosing it is a promise the config never made and a reader has to guess at.",
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        if (!isEmitCallOnEventEmitterService(node)) return
+        const args = node.arguments[0]
+        const optionsProperty = findObjectProperty(args, "options")
+        if (!optionsProperty) return
+        const optionsValue = optionsProperty.value
+        const hasUseLocal = findObjectProperty(optionsValue, "useLocal")
+        const hasUseNats = findObjectProperty(optionsValue, "useNats")
+        if (hasUseLocal || hasUseNats) {
+          context.report({ node: optionsProperty, messageId: "callsite" })
+        }
+      },
+    }
+  },
+}
+
+export const rules = {
+  "nats-bridge-delivery-contract": natsBridgeDeliveryContract,
+  "no-call-site-transport-override": noCallSiteTransportOverride,
+}
 
 export const recommended = {
   "starci-be/nats-bridge-delivery-contract": "error",
+  "starci-be/no-call-site-transport-override": "error",
 }

@@ -12,7 +12,14 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { mustInjectEntityManager, noInjectedRepository, requireEntityTableName, rules } from "./data-access.mjs"
+import {
+  mustInjectEntityManager,
+  noEagerRelation,
+  noInjectedRepository,
+  noOuterManagerInTransaction,
+  requireEntityTableName,
+  rules,
+} from "./data-access.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -92,6 +99,84 @@ test("DATA-3: an entity names its table", () => {
       {
         code: '@Entity({ schema: "billing" }) class CartItemEntity {}',
         errors: [{ messageId: "inferred" }],
+      },
+    ],
+  })
+})
+
+test("DATA-4 (Rule 5): everything inside a transaction receives the transactional manager", () => {
+  tester.run("no-outer-manager-in-transaction", noOuterManagerInTransaction, {
+    valid: [
+      // the callback uses only the manager it was handed
+      `class H {
+        constructor(private readonly entityManager: EntityManager) {}
+        async run() {
+          return this.entityManager.transaction(async (manager) => {
+            await manager.save(FooEntity, {})
+            return manager.query("SELECT 1")
+          })
+        }
+      }`,
+      // a DIFFERENT field read through this. inside the callback is not the same handle
+      `class H {
+        constructor(private readonly entityManager: EntityManager, private readonly logger: Logger) {}
+        async run() {
+          return this.entityManager.transaction(async (manager) => {
+            this.logger.log("checkout")
+            return manager.save(FooEntity, {})
+          })
+        }
+      }`,
+      // not a transaction call at all
+      "class H { constructor(private readonly entityManager: EntityManager) {} async run() { return this.entityManager.find(FooEntity) } }",
+    ],
+    invalid: [
+      {
+        // reaches for the outer manager instead of the one the callback received
+        code: `class H {
+          constructor(private readonly entityManager: EntityManager) {}
+          async run() {
+            return this.entityManager.transaction(async (manager) => {
+              await this.entityManager.save(FooEntity, {})
+            })
+          }
+        }`,
+        errors: [{ messageId: "outerManager" }],
+      },
+      {
+        // the second write is the one that escapes - the first correctly used the handle
+        code: `class H {
+          constructor(private readonly entityManager: EntityManager) {}
+          async run() {
+            return this.entityManager.transaction(async (manager) => {
+              await manager.save(FooEntity, {})
+              await this.entityManager.save(BarEntity, {})
+            })
+          }
+        }`,
+        errors: [{ messageId: "outerManager" }],
+      },
+    ],
+  })
+})
+
+test("DATA-5 (Rule 6): a relation carries no eager: true", () => {
+  tester.run("no-eager-relation", noEagerRelation, {
+    valid: [
+      "class C { @ManyToOne(() => CourseEntity, (c) => c.items) course: CourseEntity }",
+      "class C { @ManyToOne(() => CourseEntity, (c) => c.items, { eager: false }) course: CourseEntity }",
+      "class C { @ManyToOne(() => CourseEntity, (c) => c.items, { nullable: true }) course: CourseEntity }",
+      // eager on an unrelated decorator is not a relation grant
+      'class C { @Column({ eager: true }) name: string }',
+    ],
+    invalid: [
+      {
+        code: "class C { @ManyToOne(() => CourseEntity, (c) => c.items, { eager: true }) course: CourseEntity }",
+        errors: [{ messageId: "eager" }],
+      },
+      {
+        code: "class C { @OneToMany(() => ItemEntity, (i) => i.course, { eager: true }) items: ItemEntity[] }",
+        errors: [{ messageId: "eager" }],
       },
     ],
   })

@@ -14,15 +14,23 @@
  *   - E2E-2 (named steps, not one long case). Counting `it` blocks would refuse a flow that is
  *     genuinely one step, and a rule whose first false positive is legitimate teaches authors that
  *     the rule is wrong rather than that they are.
- *   - E2E-5, E2E-6 and E2E-9 turn on WHAT is asserted or WHO is acting, which is meaning.
- *   - E2E-8 (one place stands the world up) is a fact about a repository's fixtures, not about a
- *     file, so it belongs to a gate that can see the tree rather than to a rule that sees one file.
+ *   - E2E-5, E2E-6 and E2E-9 turn on WHAT is asserted or WHO is acting, which is meaning. E2E-6 in
+ *     particular has no shape to deny: absence is proved through a stored row, a socket silence
+ *     window, or a rejected promise depending on the flow, and a rule narrow enough to accept all
+ *     three accepts everything. E2E-9's ban on a shared actor is a fact about TWO files at once,
+ *     which one file's AST cannot see.
+ *   - E2E-8 (one place stands the world up) is STILL a fact about a repository's fixtures for its
+ *     first half, not about one file, so THAT half belongs to a gate that can see the tree. Its
+ *     second half - "a spec file contains no wiring of its own" - is a per-file shape after all, the
+ *     same kind of shape `e2e-uses-production-transport` already refuses for buses and workers, and
+ *     is added below.
  *   - E2E-10 (a flow logs nothing) is already held: `no-console` and `no-framework-logger` in the
  *     observability law cover every call site, and a second rule saying the same thing in this lane
- *     would double every report.
+ *     would double every report. It stays undeclared here on purpose, not by oversight.
  *
- * The rules below enforce only exact syntax: transport bypass, absence of any persisted-state read,
- * direct provider imports, sleeps and branches. They do not pretend to judge business meaning.
+ * The rules below enforce only exact syntax: transport bypass, wiring built inline instead of
+ * through the shared world, absence of any persisted-state read, direct provider imports, sleeps and
+ * branches. They do not pretend to judge business meaning.
  */
 
 /** Files this law governs. A flow is a named lane, not every file that happens to touch a database. */
@@ -156,17 +164,59 @@ export const noBranchInFlowStep = {
   },
 }
 
+// -- E2E-8 (the per-file half: a spec builds no wiring of its own) --------------------------------
+
+/** A flow boots through the shared world; it does not build its own copy of the app. */
+export const noWiringInFlowSpec = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "An e2e spec boots through the shared world helper and builds no testing module of its own (E2E-8).",
+    },
+    schema: [],
+    messages: {
+      wiring:
+        "`Test.createTestingModule(...)` builds this flow's own copy of the app instead of booting through the shared world helper. E2E-8: the world is stood up in one place, and a spec file carries no wiring of its own - when the wiring changes, every flow that inlined its own module has to change with it, and two flows standing the world up slightly differently is how nobody learns where they differ. Boot through the shared helper and override only the one token this flow needs.",
+    },
+  },
+  create(context) {
+    if (!isE2eSpec(context.filename || context.getFilename())) return {}
+    return {
+      CallExpression(node) {
+        const callee = node.callee
+        if (!callee || callee.type !== "MemberExpression" || callee.computed) return
+        if (callee.object.type !== "Identifier" || callee.object.name !== "Test") return
+        if (callee.property.name !== "createTestingModule") return
+        context.report({ node: callee, messageId: "wiring" })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "e2e-uses-production-transport": e2eUsesProductionTransport,
   "no-sleep-in-flow": noSleepInFlow,
   "no-branch-in-flow-step": noBranchInFlowStep,
+  "no-wiring-in-flow-spec": noWiringInFlowSpec,
 }
 
 /**
  * The level this law asks for, as the plugin's own opinion.
  *
- * Both are exact and both fire on a syntactic shape rather than on a judgement, so neither carries
- * the false-positive risk that would justify adopting it at `warn`.
+ * The first three are exact and fire on a syntactic shape rather than on a judgement, so none of
+ * them carries the false-positive risk that would justify adopting it at `warn`.
+ *
+ * `no-wiring-in-flow-spec` is exact in the SAME sense - `Test.createTestingModule(...)` is a fixed
+ * shape, not a guess - but it was measured at 60 of 77 e2e files in the reference repository
+ * building their own testing module rather than calling `bootFlowWorld`. That is real, pre-existing
+ * debt this task does not fix, so the rule lands at `warn` with the count rather than `error`,
+ * exactly like a rule that has not yet been burned down.
  */
-export const recommended = Object.fromEntries(Object.keys(rules).map((name) => [`starci-be/${name}`, "error"]))
+export const recommended = {
+  "starci-be/e2e-uses-production-transport": "error",
+  "starci-be/no-sleep-in-flow": "error",
+  "starci-be/no-branch-in-flow-step": "error",
+  "starci-be/no-wiring-in-flow-spec": "warn", // no=60 of 77 - pre-existing, not burned down here
+}

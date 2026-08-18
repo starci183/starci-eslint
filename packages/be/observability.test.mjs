@@ -11,7 +11,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { noFrameworkLogger, noInterpolatedLogMessage, rules } from "./observability.mjs"
+import { noFrameworkLogger, noInterpolatedLogMessage, noErrorWordingAsLogIdentity, rules } from "./observability.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -74,6 +74,39 @@ test("OBSERVABILITY-2: the event name comes from the enum, not from a built stri
         // a bare string is one reword away from being a different event to every dashboard
         code: "winstonService.warn('quota nearly spent', { userId })",
         errors: [{ messageId: "built" }],
+      },
+    ],
+  })
+})
+
+test("OBSERVABILITY-5: a failure's log data groups by the exception's code, not its wording", () => {
+  tester.run("no-error-wording-as-log-identity", noErrorWordingAsLogIdentity, {
+    valid: [
+      // code is the grouping key; the message may still ride beside it as a secondary field
+      "try { x() } catch (error) { this.winstonService.error(WinstonLog.JobFailed, { code: error.code, message: error.message }) }",
+      // code alone, no wording at all
+      "try { x() } catch (error) { this.winstonService.error(WinstonLog.JobFailed, { code: error.code }) }",
+      // outside any catch, this rule has nothing to bind to
+      "this.winstonService.error(WinstonLog.JobFailed, { message: someError.message })",
+      // a field that happens to be named 'error' but is not THIS catch's own identifier
+      "try { x() } catch (error) { this.winstonService.error(WinstonLog.JobFailed, { detail: someOtherVar.message }) }",
+      // a catch with no binding has no error identifier to reference at all
+      "try { x() } catch { this.winstonService.error(WinstonLog.JobFailed, { outcome: 'failed' }) }",
+      // not the logging service
+      "try { x() } catch (error) { this.mailer.error(`failed: ${error}`) }",
+    ],
+    invalid: [
+      {
+        code: "try { x() } catch (error) { this.winstonService.error(WinstonLog.JobFailed, { error: error.message }) }",
+        errors: [{ messageId: "wordingOnly" }],
+      },
+      {
+        code: "try { x() } catch (error) { this.winstonService.error(WinstonLog.JobFailed, { reason: String(error) }) }",
+        errors: [{ messageId: "wordingOnly" }],
+      },
+      {
+        code: "try { x() } catch (error) { this.winstonService.error(WinstonLog.JobFailed, { detail: `job failed: ${error}` }) }",
+        errors: [{ messageId: "wordingOnly" }],
       },
     ],
   })

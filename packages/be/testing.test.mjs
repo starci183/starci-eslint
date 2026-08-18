@@ -15,7 +15,9 @@ import tsParser from "@typescript-eslint/parser"
 import {
   e2eAssertsPersistedState,
   harnessCallsProviderDirectly,
+  noApiShapedE2eFilename,
   noCallOnlySpec,
+  noMarkerModelStub,
   noModelCallInE2e,
   rules,
 } from "./testing.mjs"
@@ -227,6 +229,80 @@ test("TESTING-10: a model-quality harness calls the declared provider directly",
         filename: HARNESS,
         code: `const quality = await grade(prompt)`,
         errors: [{ messageId: "missingProvider" }],
+      },
+    ],
+  })
+})
+
+test("TESTING-1 / E2E-1: an e2e filename is the business sentence, not an API-shape noun", () => {
+  tester.run("no-api-shaped-e2e-filename", noApiShapedE2eFilename, {
+    valid: [
+      // a business sentence
+      { filename: E2E, code: "it('x', () => {})" },
+      // multi-word business sentences that happen to end near an API-flavoured word but not one
+      { filename: "D:/repo/src/tests/e2e/community-chat-room-authorization.e2e-spec.ts", code: "it('x', () => {})" },
+      { filename: "D:/repo/src/tests/e2e/github-account-link.e2e-spec.ts", code: "it('x', () => {})" },
+      // not an e2e file - this code has nothing to say about a unit spec's name
+      { filename: UNIT, code: "it('x', () => {})" },
+    ],
+    invalid: [
+      // the law's own anchor example
+      {
+        filename: "D:/repo/src/tests/e2e/rewards-queries.e2e-spec.ts",
+        code: "it('x', () => {})",
+        errors: [{ messageId: "apiShaped" }],
+      },
+      {
+        filename: "D:/repo/src/tests/e2e/installment-plan-queries.e2e-spec.ts",
+        code: "it('x', () => {})",
+        errors: [{ messageId: "apiShaped" }],
+      },
+      {
+        filename: "D:/repo/src/tests/e2e/course-resolvers.e2e-spec.ts",
+        code: "it('x', () => {})",
+        errors: [{ messageId: "apiShaped" }],
+      },
+    ],
+  })
+})
+
+test("TESTING-7: a model stub returns a payload the production parser can parse, not a marker", () => {
+  const WORLD_HELPER = "D:/repo/src/tests/helpers/flow-world.ts"
+  tester.run("no-marker-model-stub", noMarkerModelStub, {
+    valid: [
+      // the real shape: JSON.stringify(...) is a CallExpression, not a bare marker Literal
+      {
+        filename: WORLD_HELPER,
+        code: "model.run = jest.fn().mockResolvedValue({ text: JSON.stringify({ answer: 'x' }) })",
+      },
+      // an object literal payload with a "stub" field elsewhere is not what this rule looks at -
+      // only a BARE string literal standing in for the whole argument is
+      { filename: WORLD_HELPER, code: "model.run = jest.fn().mockResolvedValue({ text: answer.text, provider: 'stub' })" },
+      // a real (non-marker) literal payload is a legitimate stub
+      { filename: WORLD_HELPER, code: "model.run = jest.fn().mockResolvedValue('{\"answer\":1}')" },
+      // not test infra - a marker string outside tests/helpers/ is not this rule's business
+      { filename: UNIT, code: "x.run = jest.fn().mockResolvedValue('stubbed')" },
+    ],
+    invalid: [
+      {
+        filename: WORLD_HELPER,
+        code: "model.run = jest.fn().mockResolvedValue('stubbed')",
+        errors: [{ messageId: "marker" }],
+      },
+      {
+        filename: WORLD_HELPER,
+        code: "model.run = jest.fn().mockReturnValue('ok')",
+        errors: [{ messageId: "marker" }],
+      },
+      {
+        filename: WORLD_HELPER,
+        code: "model.run = jest.fn().mockImplementation(() => 'test')",
+        errors: [{ messageId: "marker" }],
+      },
+      {
+        filename: WORLD_HELPER,
+        code: "model.run = jest.fn().mockImplementation(() => { return 'mock' })",
+        errors: [{ messageId: "marker" }],
       },
     ],
   })

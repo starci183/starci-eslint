@@ -12,7 +12,14 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { noNonAsciiSource, requireEnumMemberJsdoc, requireExportJsdoc, rules } from "./comments.mjs"
+import {
+  noNonAsciiSource,
+  noRestatedNameJsdoc,
+  requireEnumMemberJsdoc,
+  requireExportJsdoc,
+  requireVnOkReason,
+  rules,
+} from "./comments.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -122,6 +129,59 @@ test("COMMENT-4: source stays ASCII unless the line is marked as depended-upon d
         filename: SRC,
         code: "// done \u2705\nconst x = 1",
         errors: [{ messageId: "nonAscii" }],
+      },
+    ],
+  })
+})
+
+test("law 6: a vn-ok marker carries a reason; a bare marker is not an exemption", () => {
+  tester.run("require-vn-ok-reason", requireVnOkReason, {
+    valid: [
+      // the marker names the fact the next sweep needs: the provider sends this exact string
+      {
+        filename: SRC,
+        code: "const ok = 'Giao dich thanh cong' // vn-ok: the provider returns this exact string",
+      },
+      // a file with no marker at all is not this rule's concern
+      { filename: SRC, code: "const greeting = 'hello'" },
+    ],
+    invalid: [
+      // no colon, no reason - a bare marker used as a silent gate-off switch
+      {
+        filename: SRC,
+        code: "const ok = 'Giao dich thanh cong' // vn-ok",
+        errors: [{ messageId: "bareMarker" }],
+      },
+      // a colon with nothing after it is still bare - the marker states no reason
+      {
+        filename: SRC,
+        code: "const ok = 'Giao dich thanh cong' // vn-ok:",
+        errors: [{ messageId: "bareMarker" }],
+      },
+    ],
+  })
+})
+
+test("law 7: a doc block that only re-spells the declared name is COMMENT-3 wearing COMMENT-1's shape", () => {
+  tester.run("no-restated-name-jsdoc", noRestatedNameJsdoc, {
+    valid: [
+      // says what it is FOR, in words the name itself does not carry
+      "/** Reads a learner. */\nexport const readUser = () => null",
+      // real consequence, not the member's own name re-spelled
+      "/** x */\nexport enum Verdict {\n  /** Nothing settled, so nothing is granted. */\n  Pending,\n}",
+      // no doc block at all is require-export-jsdoc's concern, not this rule's
+      "export const readUser = () => null",
+    ],
+    invalid: [
+      // "the" and "function" are filler; what is left is exactly "read user" - the name re-spelled
+      {
+        code: "/** The read user function. */\nexport const readUser = () => null",
+        errors: [{ messageId: "restated" }],
+      },
+      // the law's own anchor example: "the pending state" teaches nothing "Pending" did not already say
+      {
+        code: "/** x */\nexport enum Verdict {\n  /** The pending state. */\n  Pending,\n}",
+        errors: [{ messageId: "restated" }],
       },
     ],
   })

@@ -11,7 +11,13 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { handlerHasTwinSpec, handlerOverridesProcess, messageCarriesParamsOnly, rules } from "./cqrs.mjs"
+import {
+  handlerHasTwinSpec,
+  handlerOverridesProcess,
+  messageCarriesParamsOnly,
+  noHandlerEncodedFailure,
+  rules,
+} from "./cqrs.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -98,6 +104,47 @@ test("CQRS-2: a message carries params and declares no logic", () => {
         filename: COMMAND,
         code: "export class AddToCartCommand { constructor(readonly request: R, readonly user: U) {} }",
         errors: [{ messageId: "shape" }],
+      },
+    ],
+  })
+})
+
+test("CQRS-5: a handler throws its refusal, and does not encode it into the return value", () => {
+  tester.run("no-handler-encoded-failure", noHandlerEncodedFailure, {
+    valid: [
+      // the happy path returns `success: true` - only the false flag encodes a refusal
+      {
+        filename: HANDLER,
+        code: "@CommandHandler(C) class H extends ICQRSHandler<C, R> { protected override async process(c) { return { success: true, data: 1 } } }",
+      },
+      // the refusal is thrown, which is exactly what CQRS-5 asks for
+      {
+        filename: HANDLER,
+        code: "@CommandHandler(C) class H extends ICQRSHandler<C, R> { protected override async process(c) { if (!c) throw new NotFoundException({}); return { id: 1 } } }",
+      },
+      // not a handler file - a service is CQRS-4's business, not CQRS-5's
+      { filename: SERVICE, code: "class S { execute(p) { return { success: false } } }" },
+      // `error` reaches a call argument, never a return value - nothing here is encoded back to a caller
+      {
+        filename: HANDLER,
+        code: "@CommandHandler(C) class H { protected async process(c) { this.ws.error({ error: c }); return } }",
+      },
+      // a private helper beside `process` is not the handler's refusal path
+      {
+        filename: HANDLER,
+        code: "@CommandHandler(C) class H { protected async process(c) { return this.map(c) } private map(c) { return { error: c } } }",
+      },
+    ],
+    invalid: [
+      {
+        filename: HANDLER,
+        code: "@CommandHandler(C) class H extends ICQRSHandler<C, R> { protected override async process(c) { if (!c) return { success: false }; return { id: 1 } } }",
+        errors: [{ messageId: "encoded" }],
+      },
+      {
+        filename: HANDLER,
+        code: "@QueryHandler(Q) class H { protected async process(q) { return { error: 'not found' } } }",
+        errors: [{ messageId: "encoded" }],
       },
     ],
   })
