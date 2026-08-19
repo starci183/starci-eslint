@@ -62,10 +62,10 @@ test("SPLIT-5: a connected block renders only its exact pure twin", () => {
         filename: CONNECTED,
         code: `
           import { useTranslations } from "next-intl"
-          import { _DailyQuest } from "./component"
+          import { DailyQuestBase } from "./component"
           export const DailyQuest = () => {
             const t = useTranslations("quest")
-            return <_DailyQuest state="pending" props={{ label: t("label") }} />
+            return <DailyQuestBase state="pending" props={{ label: t("label") }} />
           }
         `,
       },
@@ -87,10 +87,10 @@ test("SPLIT-5: a connected block renders only its exact pure twin", () => {
         filename: CONNECTED,
         code: `
           import { useTranslations } from "next-intl"
-          import { _DailyQuest } from "./component"
+          import { DailyQuestBase } from "./component"
           export const DailyQuest = () => {
             const t = useTranslations("quest")
-            return t("empty") ? <EmptyNotice /> : <_DailyQuest state="ready" props={{ label: t("label") }} />
+            return t("empty") ? <EmptyNotice /> : <DailyQuestBase state="ready" props={{ label: t("label") }} />
           }
         `,
         errors: [{ messageId: "bypass" }],
@@ -99,7 +99,7 @@ test("SPLIT-5: a connected block renders only its exact pure twin", () => {
         filename: CONNECTED,
         code: `
           import { useTranslations } from "next-intl"
-          import { _DailyQuest } from "./component"
+          import { DailyQuestBase } from "./component"
           export const DailyQuest = () => {
             const t = useTranslations("quest")
             return t("empty")

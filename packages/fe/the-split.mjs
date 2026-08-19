@@ -66,7 +66,7 @@ export const presentationalPurity = {
 export const connectedBlockHasPresentationalTwin = {
   meta: {
     type: "problem",
-    docs: { description: "A connected block index renders only its exact `_X` twin from component.tsx." },
+    docs: { description: "A connected block index renders only its exact `XBase` twin from component.tsx." },
     schema: [],
     messages: {
       missing:
@@ -81,7 +81,7 @@ export const connectedBlockHasPresentationalTwin = {
     const block = connectedBlock(context.filename || context.getFilename())
     if (!block) return {}
 
-    const twin = `_${block}`
+    const twin = `${block}Base`
     const worldBindings = new Set()
     const rendered = []
     let importsTwin = false
