@@ -200,7 +200,7 @@ test("FILE-5: each tier sits on its own side of the feature line", () => {
       { filename: "D:/repo/packages/ui/src/branches/Tree/index.tsx", code: "export const Tree = () => null" },
       // The app holds the tiers that know one.
       { filename: "D:/repo/apps/web/src/components/blocks/fleet/FleetRow/index.tsx", code: "export const FleetRow = () => null" },
-      { filename: "D:/repo/apps/web/src/components/pages/FleetPage/component.tsx", code: "export const _FleetPage = () => null" },
+      { filename: "D:/repo/apps/web/src/components/pages/FleetPage/component.tsx", code: "export const FleetPageBase = () => null" },
       // A single-app repository has neither prefix and is governed by the rest of this law.
       { filename: "D:/repo/src/components/blocks/dashboard/DailyQuest/index.tsx", code: "export const DailyQuest = () => null" },
       { filename: "D:/repo/src/components/leaves/Badge/index.tsx", code: "export const Badge = () => null" },
@@ -214,7 +214,7 @@ test("FILE-5: each tier sits on its own side of the feature line", () => {
       },
       {
         filename: "D:/repo/packages/ui/src/pages/FleetPage/component.tsx",
-        code: "export const _FleetPage = () => null",
+        code: "export const FleetPageBase = () => null",
         errors: [{ messageId: "featureInPackage" }],
       },
       {
@@ -248,5 +248,4 @@ test("FILE-8: shells are branches with typed contracts, not a tier", () => {
     invalid: [{ filename: `${R}/shells/ModalShell/index.tsx`, code: "export const ModalShell = () => null", errors: [{ messageId: "shell" }] }],
   })
 })
-
 

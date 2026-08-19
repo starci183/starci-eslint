@@ -185,7 +185,7 @@ test("VENDOR-11: the account block owns product choices while DropdownBranch own
       },
       {
         filename: "D:/repo/src/components/blocks/auth/AccountMenu/component.tsx",
-        code: "import { DropdownBranch } from '@/components/branches/DropdownBranch'; export const _AccountMenu = () => <DropdownBranch />",
+        code: "import { DropdownBranch } from '@/components/branches/DropdownBranch'; export const AccountMenuBase = () => <DropdownBranch />",
       },
       {
         filename: "D:/repo/src/components/layouts/ShellNav/component.tsx",
@@ -205,12 +205,12 @@ test("VENDOR-11: the account block owns product choices while DropdownBranch own
       },
       {
         filename: "D:/repo/src/components/blocks/auth/AccountMenu/component.tsx",
-        code: "import { Dropdown } from '@heroui/react'; export const _AccountMenu = () => <Dropdown />",
+        code: "import { Dropdown } from '@heroui/react'; export const AccountMenuBase = () => <Dropdown />",
         errors: [{ messageId: "vendor" }, { messageId: "branch" }],
       },
       {
         filename: "D:/repo/src/components/blocks/auth/AccountMenu/component.tsx",
-        code: "import { DropdownBranch, DropdownBranchItem } from '@/components/branches/DropdownBranch'; export const _AccountMenu = () => <DropdownBranch><DropdownBranchItem /></DropdownBranch>",
+        code: "import { DropdownBranch, DropdownBranchItem } from '@/components/branches/DropdownBranch'; export const AccountMenuBase = () => <DropdownBranch><DropdownBranchItem /></DropdownBranch>",
         errors: [{ messageId: "pieces" }],
       },
       {
