@@ -22,7 +22,7 @@ const TWO_FILE_TIERS = /\/src\/components\/(pages|layouts)\/([^/]+)\/(.+)$/
 const TWO_FILE_TIERS_WITH_CATEGORY = /\/src\/components\/(overlays)\/[^/]+\/([^/]+)\/(.+)$/
 
 /** The two halves, and the twin test of each, are the whole of what a surface folder may hold. */
-const ALLOWED_IN_SURFACE_FOLDER = /^(?:component|index)(?:\.test)?\.tsx?$/
+const ALLOWED_IN_SURFACE_FOLDER = /^(?:component|index)(?:\.spec)?\.tsx?$/
 
 /** Folders that are not component code, whatever they are nested inside. */
 const NON_COMPONENT_FOLDERS = /\/src\/components\/.*\/(constants|utils|types|hooks)\//
@@ -240,9 +240,9 @@ const ROUTE_TREE_EXEMPT = /^(?:api\/|_)/
  *
  * The name is deliberately not required to match `page` or `layout`. A route's tests split by
  * CONCERN - what the screen renders, who may reach it, where the boundary sits - and forcing them
- * into one `page.test.tsx` would buy nothing but a longer file.
+ * into one `page.spec.tsx` would buy nothing but a longer file.
  */
-const ROUTE_TREE_TEST = /\.test\.(?:tsx?|jsx?)$/
+const ROUTE_TREE_TEST = /\.spec\.(?:tsx?|jsx?)$/
 
 /**
  * A file under `app/` names which page renders at which URL, and does nothing else.
@@ -362,6 +362,35 @@ export const noShellTier = {
   },
 }
 
+// -- FILE-9 --------------------------------------------------------------------------------------
+
+const UNIT_TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/
+const SEPARATE_FRONTEND_TEST_TREE = /\/(?:src\/tests|tests?\/unit|e2e)(?:\/|$)/
+
+/** Frontend units are `.spec.` twins beside the source they exercise. */
+export const unitTestColocated = {
+  meta: {
+    type: "problem",
+    docs: { description: "Frontend unit tests are colocated `.spec.` files; frontend owns no separate test tree." },
+    schema: [],
+    messages: {
+      suffix: "`{{name}}` uses the generic `.test.` suffix. A frontend unit is a colocated `.spec.` twin beside its production owner.",
+      bucket: "`{{path}}` files a frontend unit in a separate test bucket. Move the cases beside their production owner; only backend E2E owns a separate test tree.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    const match = file.match(UNIT_TEST_FILE)
+    if (!match) return {}
+    return {
+      Program(node) {
+        if (match[1] === "test") context.report({ node, messageId: "suffix", data: { name: file.slice(file.lastIndexOf("/") + 1) } })
+        if (SEPARATE_FRONTEND_TEST_TREE.test(file)) context.report({ node, messageId: "bucket", data: { path: file } })
+      },
+    }
+  },
+}
+
 export const rules = {
   "no-shell-tier": noShellTier,
   "source-tier-marker-matches-folder": sourceTierMarkerMatchesFolder,
@@ -371,6 +400,7 @@ export const rules = {
   "export-matches-folder": exportMatchesFolder,
   "no-runtime-namespace": noRuntimeNamespace,
   "monorepo-tier-belongs-to-its-side": monorepoTierBelongsToItsSide,
+  "unit-test-colocated": unitTestColocated,
 }
 
 /**

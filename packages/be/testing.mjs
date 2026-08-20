@@ -133,6 +133,35 @@ export const noCallOnlySpec = {
   },
 }
 
+// -- TESTING-7 -------------------------------------------------------------------------------------
+
+const UNIT_TEST_BUCKET = /\/(?:src\/tests|tests?\/unit)(?:\/|$)/
+
+/** Backend units are colocated `.spec.ts` files; only backend E2E owns a separate tree. */
+export const unitTestColocated = {
+  meta: {
+    type: "problem",
+    docs: { description: "Backend unit tests are colocated `.spec.ts` files; generic `.test.ts` and unit buckets are forbidden." },
+    schema: [],
+    messages: {
+      suffix: "`{{name}}` uses `.test.ts`. A backend unit is a colocated `.spec.ts` file beside its production owner.",
+      bucket: "`{{path}}` files a unit in a separate test bucket. Move it beside its production owner; only backend E2E owns a separate test tree.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    const genericUnit = /\.test\.ts$/.test(file)
+    const bucketedUnit = isUnitSpec(file) && UNIT_TEST_BUCKET.test(file)
+    if (!genericUnit && !bucketedUnit) return {}
+    return {
+      Program(node) {
+        if (genericUnit) context.report({ node, messageId: "suffix", data: { name: file.slice(file.lastIndexOf("/") + 1) } })
+        if (bucketedUnit) context.report({ node, messageId: "bucket", data: { path: file } })
+      },
+    }
+  },
+}
+
 // -- TESTING-2 -------------------------------------------------------------------------------------
 
 /** An end-to-end spec that never reads state back proves only that the server replied. */
@@ -412,6 +441,7 @@ export const noMarkerModelStub = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-call-only-spec": noCallOnlySpec,
+  "unit-test-colocated": unitTestColocated,
   "e2e-asserts-persisted-state": e2eAssertsPersistedState,
   "no-model-call-in-e2e": noModelCallInE2e,
   "harness-calls-provider-directly": harnessCallsProviderDirectly,
@@ -446,6 +476,7 @@ export const rules = {
  */
 export const recommended = {
   "starci-be/no-call-only-spec": "error", // no=0 of 182 - burned down from 1
+  "starci-be/unit-test-colocated": "error",
   "starci-be/e2e-asserts-persisted-state": "error", // no=0 of 47 - burned down from 1
   "starci-be/no-model-call-in-e2e": "error", // no=0 of 47
   "starci-be/harness-calls-provider-directly": "error",

@@ -20,6 +20,7 @@ import {
   noMarkerModelStub,
   noModelCallInE2e,
   rules,
+  unitTestColocated,
 } from "./testing.mjs"
 
 const tester = new RuleTester({
@@ -72,6 +73,20 @@ test("TESTING-6: a spec whose every assertion is a call restates the source", ()
         code: "it('a', () => { expect(a.b).toHaveBeenCalled() }); it('c', () => { expect(d.e).not.toHaveBeenCalled() })",
         errors: [{ messageId: "callOnly" }],
       },
+    ],
+  })
+})
+
+test("TESTING-7: backend units are colocated specs", () => {
+  tester.run("unit-test-colocated", unitTestColocated, {
+    valid: [
+      { filename: UNIT, code: "it('x', () => expect(1).toBe(1))" },
+      { filename: E2E, code: "it('x', () => expect(1).toBe(1))" },
+      { filename: HARNESS, code: "it('x', () => expect(1).toBe(1))" },
+    ],
+    invalid: [
+      { filename: UNIT.replace(".spec.ts", ".test.ts"), code: "it('x', () => expect(1).toBe(1))", errors: [{ messageId: "suffix" }] },
+      { filename: "D:/repo/src/tests/unit/add-to-cart.handler.spec.ts", code: "it('x', () => expect(1).toBe(1))", errors: [{ messageId: "bucket" }] },
     ],
   })
 })

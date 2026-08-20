@@ -20,6 +20,7 @@ import {
   routeTreeHoldsRoutesOnly,
   rules,
   surfaceFolderTwoFilesOnly,
+  unitTestColocated,
 } from "./file-layout.mjs"
 
 const tester = new RuleTester({
@@ -44,12 +45,17 @@ test("FILE-2: a surface folder holds its two halves and their twins", () => {
     valid: [
       { filename: `${R}/pages/DashboardPage/index.tsx`, code: "export const P = () => null" },
       { filename: `${R}/pages/DashboardPage/component.tsx`, code: "export const P = () => null" },
-      { filename: `${R}/pages/DashboardPage/component.test.tsx`, code: "export const P = () => null" },
+      { filename: `${R}/pages/DashboardPage/component.spec.tsx`, code: "export const P = () => null" },
       { filename: `${R}/overlays/auth/SignInOverlay/index.tsx`, code: "export const O = () => null" },
       // blocks and composites are NOT surface folders - they may hold more than two files
       { filename: `${R}/blocks/dashboard/DailyQuest/parts.tsx`, code: "export const X = () => null" },
     ],
     invalid: [
+      {
+        filename: `${R}/pages/DashboardPage/component.test.tsx`,
+        code: "export const P = () => null",
+        errors: [{ messageId: "extra" }],
+      },
       {
         filename: `${R}/pages/DashboardPage/DailyQuest.tsx`,
         code: "export const X = () => null",
@@ -91,11 +97,16 @@ test("FILE-6: the routing tree holds route files and nothing else", () => {
        * of the directory the next reader looks in is the opposite of the twin-test habit. The names
        * split by concern rather than matching `page`, which is how route tests are actually written.
        */
-      { filename: `${A}/dashboard/access.test.tsx`, code: "export const t = 1" },
-      { filename: `${A}/(auth)/screen.test.tsx`, code: "export const t = 1" },
-      { filename: `${A}/(auth)/layout-boundary.test.ts`, code: "export const t = 1" },
+      { filename: `${A}/dashboard/access.spec.tsx`, code: "export const t = 1" },
+      { filename: `${A}/(auth)/screen.spec.tsx`, code: "export const t = 1" },
+      { filename: `${A}/(auth)/layout-boundary.spec.ts`, code: "export const t = 1" },
     ],
     invalid: [
+      {
+        filename: `${A}/dashboard/access.test.tsx`,
+        code: "export const t = 1",
+        errors: [{ messageId: "stray" }],
+      },
       /*
        * The exact file this rule was written for. It built, linted, typechecked, produced four
        * sealed screenshots and was approved - because the law that refused it was only prose.
@@ -116,6 +127,21 @@ test("FILE-6: the routing tree holds route files and nothing else", () => {
         code: "export const f = () => null",
         errors: [{ messageId: "stray" }],
       },
+    ],
+  })
+})
+
+test("FILE-9: frontend unit specs stay beside their owner", () => {
+  tester.run("unit-test-colocated", unitTestColocated, {
+    valid: [
+      { filename: "D:/repo/src/modules/api/query-user.spec.ts", code: "export const x = 1" },
+      { filename: "D:/repo/src/components/pages/UserPage/index.spec.tsx", code: "export const x = 1" },
+      { filename: "D:/repo/scripts/check-quality.spec.mjs", code: "export const x = 1" },
+    ],
+    invalid: [
+      { filename: "D:/repo/src/modules/api/query-user.test.ts", code: "export const x = 1", errors: [{ messageId: "suffix" }] },
+      { filename: "D:/repo/src/tests/query-user.spec.ts", code: "export const x = 1", errors: [{ messageId: "bucket" }] },
+      { filename: "D:/repo/e2e/http-smoke.spec.mjs", code: "export const x = 1", errors: [{ messageId: "bucket" }] },
     ],
   })
 })
@@ -248,4 +274,3 @@ test("FILE-8: shells are branches with typed contracts, not a tier", () => {
     invalid: [{ filename: `${R}/shells/ModalShell/index.tsx`, code: "export const ModalShell = () => null", errors: [{ messageId: "shell" }] }],
   })
 })
-
