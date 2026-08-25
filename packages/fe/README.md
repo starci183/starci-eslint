@@ -1,6 +1,6 @@
 # @starci/eslint-canon-fe
 
-**58 ESLint rules, from 16 laws, that hold a React front end to one way of being written.**
+**74 ESLint rules, from 18 laws, that hold a React front end to one way of being written.**
 
 Not a style pack. These rules enforce *architecture*: which tier a component belongs to, whether
 structure may be typed as a raw class string, where a vendor primitive may be imported, which file
@@ -56,6 +56,12 @@ A sample, not the list:
 | `no-inline-lint-config` | A disable comment switching the architecture off for one line |
 | `require-export-jsdoc` | An exported symbol with no stated reason to exist |
 | `no-second-language-in-source` | Copy hardcoded where the translation layer should own it |
+| `no-core-grammar-value-import-outside-adapter` | Core grammar values imported by product code instead of one adapter owner |
+| `surface-branch-requires-contract-render` | A surface used as a JSX children container instead of the contract/render lane |
+| `no-reactnode-escape-slot` | Pre-built ReactNode/JSX escaping a typed component boundary |
+| `runtime-contract-content-requires-component-type` | Runtime props paired with bound content instead of a ComponentType render |
+| `tree-contract-render-identity` | Tree/surface and its render contract claiming different identities |
+| `block-root-is-typed-composition` | A block rooted in an anonymous fragment or structural host element |
 
 Every rule names the law that declares it — `ruleOwners` maps rule name to law, so a failing build
 line leads straight to the document that explains why.

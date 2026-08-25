@@ -15,6 +15,11 @@
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
 import { recommended as contractRecommended, rules as contractRules } from "./contract.mjs"
 import { recommended as fileLayoutRecommended, rules as fileLayoutRules } from "./file-layout.mjs"
+import {
+  audits as grammarBoundaryAudits,
+  recommended as grammarBoundaryRecommended,
+  rules as grammarBoundaryRules,
+} from "./grammar-boundary.mjs"
 import { recommended as iconRecommended, rules as iconRules } from "./icon.mjs"
 import { recommended as landmarkRecommended, rules as landmarkRules } from "./landmark.mjs"
 import { recommended as loadingRecommended, rules as loadingRules } from "./loading.mjs"
@@ -43,6 +48,12 @@ const CONTRIBUTIONS = [
   { law: "comments", rules: commentsRules, recommended: commentsRecommended },
   { law: "contract", rules: contractRules, recommended: contractRecommended },
   { law: "file-layout", rules: fileLayoutRules, recommended: fileLayoutRecommended },
+  {
+    law: "grammar-boundary",
+    rules: grammarBoundaryRules,
+    recommended: grammarBoundaryRecommended,
+    audits: grammarBoundaryAudits,
+  },
   { law: "icon", rules: iconRules, recommended: iconRecommended },
   { law: "landmark", rules: landmarkRules, recommended: landmarkRecommended },
   { law: "loading", rules: loadingRules, recommended: loadingRecommended },

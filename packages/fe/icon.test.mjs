@@ -8,7 +8,6 @@
  * first and must never be deleted to make an import tidier.
  */
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
@@ -17,7 +16,6 @@ import {
   noDecorativeIconInMetricCell,
   noOffScaleGlyphSize,
   noVendorIconOutsideIconLeaf,
-  rankArtworkIsAClosedSet,
   rules,
 } from "./icon.mjs"
 
@@ -36,8 +34,6 @@ const ICON_LEAF_BRANDS = `${R}/leaves/Icon/brands.tsx`
 const OTHER_LEAF = `${R}/leaves/SeeMoreLink/index.tsx`
 const BLOCK = `${R}/blocks/dashboard/DailyQuest/component.tsx`
 const METRIC_CELL = `${R}/composites/LabelledProgressRow/index.tsx`
-const ICON_LAW = readFileSync(new URL("../../patterns/fe/icon/INDEX.md", import.meta.url), "utf8")
-
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
     assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -88,17 +84,13 @@ test("ICON-6: the icon leaf owns the library, and a subpath does not walk around
   })
 })
 
-test("ICON-9: the active gate records feature-map ownership without inventing a stale mirror", () => {
-  assert.match(ICON_LAW, /\| `ICON-9` \|/)
-  assert.match(ICON_LAW, /feature map/i)
-  assert.match(ICON_LAW, /chưa neo được/i)
-})
-
-test("ICON-7: only the Heroicons outline and micro families may supply glyphs", () => {
+test("ICON-7: upstream Heroicons plus the custom-only StarCi extension are the whole glyph surface", () => {
   tester.run("heroicons-is-the-glyph-vendor", heroiconsIsTheGlyphVendor, {
     valid: [
       { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
       { filename: ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/16/solid\"" },
+      { filename: ICON_LEAF, code: "import { MindMapIcon } from \"@starci/heroicons/24/outline\"" },
+      { filename: ICON_LEAF, code: "import { MindMapIcon } from \"@starci/heroicons/16/solid\"" },
       { filename: ICON_LEAF_BRANDS, code: "import type { SVGProps } from \"react\"" },
       { filename: "D:/repo/scripts/build.ts", code: "import { X } from \"lucide-react\"" },
     ],
@@ -121,6 +113,16 @@ test("ICON-7: only the Heroicons outline and micro families may supply glyphs", 
       {
         filename: ICON_LEAF,
         code: "import { FireIcon } from \"@heroicons/react/24/solid\"",
+        errors: [{ messageId: "vendor" }],
+      },
+      {
+        filename: ICON_LEAF,
+        code: "import { Trophy } from \"@iconify/react\"",
+        errors: [{ messageId: "vendor" }],
+      },
+      {
+        filename: ICON_LEAF,
+        code: "import { Custom } from \"@starci/heroicons/20/solid\"",
         errors: [{ messageId: "vendor" }],
       },
     ],
@@ -169,71 +171,6 @@ test("ICON-10: a repeated metric cell does not invent a decorative feature glyph
         filename: METRIC_CELL,
         code: "const Row = () => <div><Icon props={{ name: 'course' }} /><Text /></div>",
         errors: [{ messageId: "decorative" }],
-      },
-    ],
-  })
-})
-
-const RANK_LEAF = `${R}/leaves/RankMark/index.tsx`
-
-test("ICON-11: the rank leaf may import its award artwork, and no other file may", () => {
-  tester.run("no-vendor-icon-outside-icon-leaf", noVendorIconOutsideIconLeaf, {
-    valid: [{ filename: RANK_LEAF, code: "import { Icon } from '@iconify/react'" }],
-    invalid: [
-      {
-        filename: BLOCK,
-        code: "import { Icon } from '@iconify/react'",
-        errors: [{ messageId: "vendor" }],
-      },
-      {
-        // The exemption is one PACKAGE, not one folder: the rank leaf reaching for a
-        // second catalogue is the same escape wearing an approved filename.
-        filename: RANK_LEAF,
-        code: "import { Trophy } from '@phosphor-icons/react'",
-        errors: [{ messageId: "vendor" }],
-      },
-    ],
-  })
-  tester.run("heroicons-is-the-glyph-vendor", heroiconsIsTheGlyphVendor, {
-    valid: [{ filename: RANK_LEAF, code: "import { Icon } from '@iconify/react'" }],
-    invalid: [
-      {
-        filename: OTHER_LEAF,
-        code: "import { Icon } from '@iconify/react'",
-        errors: [{ messageId: "vendor" }],
-      },
-    ],
-  })
-})
-
-test("ICON-11: the award vocabulary is four artworks, closed", () => {
-  tester.run("rank-artwork-is-a-closed-set", rankArtworkIsAClosedSet, {
-    valid: [
-      {
-        filename: RANK_LEAF,
-        code: "const PLACES = { 1: 'fluent-emoji-flat:1st-place-medal', 2: 'fluent-emoji-flat:2nd-place-medal', 3: 'fluent-emoji-flat:3rd-place-medal' }",
-      },
-      { filename: RANK_LEAF, code: "const FALLBACK = 'fluent-emoji-flat:trophy'" },
-      // A file naming no award artwork at all is simply not this rule's business.
-      { filename: BLOCK, code: "const label = 'first place'" },
-      // The twin test of the rank leaf has to name the whole map to prove it is closed.
-      {
-        filename: `${R}/leaves/RankMark/index.test.tsx`,
-        code: "const cases = ['fluent-emoji-flat:1st-place-medal', 'fluent-emoji-flat:4th-place-medal']",
-      },
-    ],
-    invalid: [
-      {
-        // A fifth medal is a decision about what a PLACE means, and it is made in the law.
-        filename: RANK_LEAF,
-        code: "const FOURTH = 'fluent-emoji-flat:4th-place-medal'",
-        errors: [{ messageId: "unknown" }],
-      },
-      {
-        // An approved id in an unapproved file still splits the map in two.
-        filename: BLOCK,
-        code: "const mine = 'fluent-emoji-flat:trophy'",
-        errors: [{ messageId: "outside" }],
       },
     ],
   })

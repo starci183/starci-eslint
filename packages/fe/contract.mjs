@@ -152,11 +152,35 @@ export const isTestFile = (filename) => /\.(?:test|spec)\.(?:ts|tsx|js|jsx|mjs|c
 /** Product source lives under `src/`; tooling and config are out of scope. */
 export const isSourceFile = (filename) => normalizePath(filename).includes("/src/")
 
+/**
+ * True for a branch that draws content parsed from an authored document.
+ *
+ * WHY THE TABLE CANNOT HOLD THESE. An entry declares every slot inside it, by name - that is
+ * `CONTRACT-11`, and it is what makes an entry a constraint rather than a container. A markdown
+ * document has no such list: the children of one `ul` are whichever of a dozen node kinds the author
+ * typed, in whichever order, nested however deep. Any `children` record written for it would be a
+ * guess, and a guess in the table is worse than no entry at all, because the next reader takes it
+ * for a rule somebody checked.
+ *
+ * The same is true one level down, which is why the list has three members rather than one. A
+ * highlighted code region is a string of vendor HTML injected into the node; a rendered diagram is
+ * an SVG produced from authored source the same way. Neither has slots to name, and neither is a
+ * different case from the document that contains them.
+ *
+ * THIS IS A FOLDER EXEMPTION, exactly like the leaf one above, and it carries the same cost: anyone
+ * can escape these rules by filing a component here. What keeps a file out is a question a person
+ * asks - does this component receive its children as PARSED CONTENT rather than as a designed
+ * arrangement? A block that merely has many children is not this; it has a shape somebody chose, and
+ * a shape somebody chose is what the table is for.
+ */
+export const isAuthoredDocumentBranch = (filename) =>
+  /\/src\/components\/branches\/(?:Article|MarkdownCodeBlock|MermaidDiagram)\//.test(normalizePath(filename))
+
 /** Product source these rules govern: under `src/`, not a test, not a leaf, not the frame. */
 export const isGovernedFile = (filename) => {
   const file = normalizePath(filename)
   if (!isSourceFile(file) || isTestFile(file)) return false
-  return !isLeafFile(file) && !isContractFrameFile(file)
+  return !isLeafFile(file) && !isContractFrameFile(file) && !isAuthoredDocumentBranch(file)
 }
 
 // -- reading the table --------------------------------------------------------------------------

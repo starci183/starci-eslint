@@ -17,6 +17,7 @@ import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
+  isGovernedFile,
   contractChildrenAreTyped,
   noInteractionClassInEntry,
   contractWhyIsAReason,
@@ -683,4 +684,18 @@ test("CONTRACT-11: every entry declares a closed typed child grammar", () => {
       { filename: TABLE, code: contractTable('    "title-row": { classes: ["flex"], children: { title: { optional: true } }, why: "..." },'), errors: [{ messageId: "untyped" }] },
     ],
   })
+})
+
+
+test("the authored-document branches are exempt, and only for parsed content", () => {
+  // A document renderer receives its children from an author, not from a design, so no entry can
+  // name them. The exemption is a folder - these two, and nothing that merely looks busy.
+  assert.equal(isGovernedFile("D:/repo/src/components/branches/Article/index.tsx"), false)
+  assert.equal(isGovernedFile("D:/repo/src/components/branches/MarkdownCodeBlock/index.tsx"), false)
+  assert.equal(isGovernedFile("D:/repo/src/components/branches/MermaidDiagram/index.tsx"), false)
+  // A branch beside them is still governed: many children is not the same fact as parsed children.
+  assert.equal(isGovernedFile("D:/repo/src/components/branches/SurfaceCard/index.tsx"), true)
+  assert.equal(isGovernedFile("D:/repo/src/components/branches/TableBranch/index.tsx"), true)
+  // A block that happens to be named the same thing elsewhere in the tree is not exempt.
+  assert.equal(isGovernedFile("D:/repo/src/components/blocks/learn/Article/component.tsx"), true)
 })

@@ -34,8 +34,21 @@ const LEGACY_SHELL_DIR = "/src/components/shells/"
 /** Named surface branches may own the vendor wrapper they project a content contract into. */
 const SURFACE_BRANCH = /\/src\/components\/branches\/(?:SurfaceCard|SurfaceAccordionCard|SurfaceListCard|SurfaceFormCard)\//
 
+/**
+ * `TableBranch` owns the vendor table, and it is a BRANCH because a leaf could not hold it.
+ *
+ * A leaf's `props` must satisfy `ComponentData`, which is JSON to the bottom. A table cell carries
+ * inline content - a link mid-phrase, a path set in code - and none of that survives a JSON slot, so
+ * a leaf could only accept cells already flattened to text. Flattening is the loss the table exists
+ * to prevent, which is why the owner sits here beside the surface family rather than in `leaves/`.
+ */
+const TABLE_BRANCH = /\/src\/components\/branches\/TableBranch\//
+
 const isAllowedVendorOwner = (file) =>
-  file.includes("/src/components/leaves/") || MECHANICS_BRANCH.test(file) || SURFACE_BRANCH.test(file)
+  file.includes("/src/components/leaves/")
+  || MECHANICS_BRANCH.test(file)
+  || SURFACE_BRANCH.test(file)
+  || TABLE_BRANCH.test(file)
 
 /** True for a file inside the component tree, where the boundary applies. */
 const isComponentFile = (filename) => normalizePath(filename).includes("/src/components/")
@@ -60,7 +73,7 @@ export const vendorBoundary = {
     schema: [],
     messages: {
       outside:
-        "This component does not own a vendor primitive. Vendor imports belong to leaves, ModalBranch/DrawerBranch/DropdownBranch, and the named SurfaceCard family branches that project contracts into vendor bodies.",
+        "This component does not own a vendor primitive. Vendor imports belong to leaves, ModalBranch/DrawerBranch/DropdownBranch, TableBranch, and the named SurfaceCard family branches that project contracts into vendor bodies.",
       emptyBranch:
         "ModalBranch/DrawerBranch/DropdownBranch must wrap their vendor interaction primitive; otherwise this is an ordinary branch in a privileged mechanics path.",
       legacyShell:
@@ -525,6 +538,61 @@ export const authOverlayOwnsSingleContentHost = {
   },
 }
 
+/**
+ * `VENDOR-15` - a table is written through `TableBranch` or it is not written.
+ *
+ * WHY THIS RULE EXISTS BESIDE `vendor-boundary`. That rule refuses a vendor IMPORT written in the
+ * wrong file, so it can only see boundaries that were crossed by importing something. A table built
+ * by hand imports nothing at all: it is `<table>` and `<tr>` and a column of borders, and the vendor
+ * it stands in for is never named anywhere in the file. That is the quieter failure and the one this
+ * rule is for - it refuses the ABSENCE, where its neighbour refuses the presence.
+ *
+ * WHAT IT READS. The tag names of the table family, and the ARIA roles that build a table without
+ * them. Reading both matters because the two substitutes look nothing alike in source: one is a
+ * semantic `<table>` somebody thought was harmless, the other is a grid of `div`s wearing
+ * `role="row"`. Neither is refused inside `TableBranch`, which is the one file that may draw them.
+ *
+ * WHAT IT CANNOT SEE. A grid of plain `div`s carrying no role at all, an element name resolved at
+ * runtime, and a table reached through a re-export under another name. It reads what is written; a
+ * hand-built grid that declares neither tag nor role is invisible to it, which is the same blind
+ * spot every anatomy rule in this file carries.
+ */
+const TABLE_TAGS = new Set(["table", "thead", "tbody", "tfoot", "tr", "th", "td"])
+const TABLE_ROLES = new Set(["table", "grid", "row", "rowgroup", "columnheader", "rowheader", "gridcell"])
+
+export const tablesGoThroughTableBranch = {
+  meta: {
+    type: "problem",
+    docs: { description: "Rows and columns are drawn by TableBranch, never rebuilt by hand." },
+    schema: [],
+    messages: {
+      tag: "`<{{name}}>` is table anatomy written by hand. `TableBranch` owns HeroUI `Table` and its compound parts; pass it cells and let it rebuild the header, the row-header column and the scroll container.",
+      role: "`role=\"{{name}}\"` builds a table out of neutral elements. `TableBranch` owns the vendor that already reports these roles; a hand-built grid loses its keyboard model and its accessible name.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename?.() || "")
+    // The owner may draw what it owns. Everything else in the component tier may not.
+    if (!isComponentFile(file) || TABLE_BRANCH.test(file)) return {}
+    return {
+      JSXOpeningElement(node) {
+        const name = node.name
+        if (name?.type === "JSXIdentifier" && TABLE_TAGS.has(name.name)) {
+          context.report({ node: name, messageId: "tag", data: { name: name.name } })
+          return
+        }
+        for (const attribute of node.attributes || []) {
+          if (attribute.type !== "JSXAttribute" || attribute.name?.name !== "role") continue
+          const value = attribute.value
+          if (value?.type !== "Literal" || typeof value.value !== "string") continue
+          if (!TABLE_ROLES.has(value.value)) continue
+          context.report({ node: attribute, messageId: "role", data: { name: value.value } })
+        }
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "vendor-boundary": vendorBoundary,
@@ -537,6 +605,7 @@ export const rules = {
   "auth-overlay-owns-single-content-host": authOverlayOwnsSingleContentHost,
   "checkbox-keeps-compound-anatomy": checkboxKeepsCompoundAnatomy,
   "no-internal-starci-href": noInternalStarciHref,
+  "tables-go-through-table-branch": tablesGoThroughTableBranch,
 }
 
 /**

@@ -21,6 +21,7 @@ import {
   modalBranchOwnsScrollBody,
   noSurfaceBranchInOverlay,
   rules,
+  tablesGoThroughTableBranch,
   textLinkUsesHeroLink,
   vendorBoundary,
 } from "./vendor-boundary.mjs"
@@ -330,6 +331,49 @@ test("VENDOR-12: the auth overlay has one zero-inset content host", () => {
         filename: "D:/repo/src/components/overlays/auth/SignInOverlay/component.tsx",
         code: "import { ModalBranch } from '@/components/branches/ModalBranch'; export const Overlay = ({ render, onDismiss }) => <ModalBranch isOpen contract={render.meta.contract} render={render} onDismiss={onDismiss}><ContractContent contract={render.meta.contract} render={render} /></ModalBranch>",
         errors: [{ messageId: "duplicate" }],
+      },
+    ],
+  })
+})
+
+
+test("tables-go-through-table-branch refuses table anatomy outside the owning branch", () => {
+  tester.run("tables-go-through-table-branch", tablesGoThroughTableBranch, {
+    valid: [
+      // The owner may draw what it owns.
+      {
+        filename: "D:/repo/src/components/branches/TableBranch/index.tsx",
+        code: "import { Table } from '@heroui/react'; export const T = () => <Table><Table.Row role='row' /></Table>",
+      },
+      // Outside the component tree the boundary does not apply - a docs page or a mail template
+      // is not a component and has no branch to go through.
+      {
+        filename: "D:/repo/src/modules/mail/receipt.tsx",
+        code: "export const R = () => <table><tbody><tr><td>total</td></tr></tbody></table>",
+      },
+      // A caller that goes through the branch is exactly what the rule is for.
+      {
+        filename: "D:/repo/src/components/branches/Article/index.tsx",
+        code: "import { TableBranch } from '@/components/branches/TableBranch'; export const A = () => <TableBranch ariaLabel='a, b' columns={[]} rows={[]} />",
+      },
+      // A role this rule does not own is left alone.
+      {
+        filename: "D:/repo/src/components/blocks/learn/Lesson/component.tsx",
+        code: "export const L = () => <div role='tablist' />",
+      },
+    ],
+    invalid: [
+      // The semantic tag somebody thought was harmless.
+      {
+        filename: "D:/repo/src/components/branches/Article/index.tsx",
+        code: "export const A = () => <table className='w-full'><tbody /></table>",
+        errors: [{ messageId: "tag" }, { messageId: "tag" }],
+      },
+      // The grid of divs wearing the roles instead - no import to see, which is the whole point.
+      {
+        filename: "D:/repo/src/components/blocks/learn/Lesson/component.tsx",
+        code: "export const L = () => <div role='grid'><div role='columnheader'>File</div></div>",
+        errors: [{ messageId: "role" }, { messageId: "role" }],
       },
     ],
   })

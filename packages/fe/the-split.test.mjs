@@ -107,6 +107,19 @@ test("SPLIT-5: a connected block renders only its exact pure twin", () => {
         `,
         errors: [{ messageId: "unused" }],
       },
+      {
+        filename: CONNECTED,
+        code: `
+          import { useTranslations } from "next-intl"
+          import { DailyQuestBase } from "./component"
+          export const DailyQuest = () => {
+            useTranslations("quest")
+            return <DailyQuestBase state="pending" props={{ label: "" }} />
+          }
+          export const DailyQuestMobile = () => DailyQuestBase({ state: "pending", props: { label: "" } })
+        `,
+        errors: [{ messageId: "called" }],
+      },
     ],
   })
 })

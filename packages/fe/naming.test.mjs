@@ -12,7 +12,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { handlerOnPrefix, preferArrowExport, rules } from "./naming.mjs"
+import { handlerOnPrefix, noDirectConstAlias, preferArrowExport, rules } from "./naming.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -98,6 +98,32 @@ test("NAMING-3: a path names its file in the one language every reader shares", 
         filename: "/repo/src/app/(auth)/dang-nhap/page.tsx",
         code: "export const x = 1",
         errors: [{ messageId: "path" }],
+      },
+    ],
+  })
+})
+
+test("machine-only: a const introduces a value instead of renaming one identifier", () => {
+  tester.run("no-direct-const-alias", noDirectConstAlias, {
+    valid: [
+      "const Apollo = createApolloClient()",
+      "const Apollo = clients.ApolloClient",
+      "const Apollo = await ApolloClient",
+      "const { ApolloClient: Apollo } = clients",
+      "let Apollo = ApolloClient",
+    ],
+    invalid: [
+      {
+        code: "const StarCiApolloClient = ApolloClient",
+        errors: [{ messageId: "alias", data: { alias: "StarCiApolloClient", original: "ApolloClient" } }],
+      },
+      {
+        code: "const localValue: typeof sourceValue = sourceValue",
+        errors: [{ messageId: "alias", data: { alias: "localValue", original: "sourceValue" } }],
+      },
+      {
+        code: "const first = source, second = source",
+        errors: [{ messageId: "alias" }, { messageId: "alias" }],
       },
     ],
   })

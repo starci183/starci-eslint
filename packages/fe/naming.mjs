@@ -72,6 +72,34 @@ export const handlerOnPrefix = {
   },
 }
 
+// -- machine-only identity -------------------------------------------------------------------------
+
+/** A const introduces a value; it does not merely give an existing identifier a second name. */
+export const noDirectConstAlias = {
+  meta: {
+    type: "problem",
+    docs: { description: "A const must not be a direct identifier-to-identifier alias." },
+    schema: [],
+    messages: {
+      alias:
+        "`const {{alias}} = {{original}}` gives one value two names without adding behavior. Use `{{original}}` directly, or make `{{alias}}` the result of the transformation it claims to represent.",
+    },
+  },
+  create(context) {
+    return {
+      VariableDeclarator(node) {
+        if (node.parent?.kind !== "const") return
+        if (node.id?.type !== "Identifier" || node.init?.type !== "Identifier") return
+        context.report({
+          node: node.id,
+          messageId: "alias",
+          data: { alias: node.id.name, original: node.init.name },
+        })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 // -- NAMING-3 --------------------------------------------------------------------------------------
 
@@ -138,6 +166,7 @@ export const rules = {
   "prefer-arrow-export": preferArrowExport,
   "handler-on-prefix": handlerOnPrefix,
   "no-second-language-in-path": noSecondLanguageInPath,
+  "no-direct-const-alias": noDirectConstAlias,
 }
 
 /**

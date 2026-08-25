@@ -75,6 +75,8 @@ export const connectedBlockHasPresentationalTwin = {
         "Connected `{{block}}` renders `<{{rendered}}>` directly. Resolve the world here, then render only `<{{twin}}>`; component.tsx owns the complete presentation.",
       unused:
         "Connected `{{block}}` imports `{{twin}}` but never renders it. Every connected render path must cross the pure twin.",
+      called:
+        "Connected `{{block}}` calls `{{twin}}(...)` as an ordinary function. Render `<{{twin}} />` so React owns the twin's hook lifecycle and every render keeps one stable component boundary.",
     },
   },
   create(context) {
@@ -84,6 +86,7 @@ export const connectedBlockHasPresentationalTwin = {
     const twin = `${block}Base`
     const worldBindings = new Set()
     const rendered = []
+    const calledTwin = []
     let importsTwin = false
     let readsWorld = false
     let rendersTwin = false
@@ -100,6 +103,7 @@ export const connectedBlockHasPresentationalTwin = {
       },
       CallExpression(node) {
         if (node.callee?.type !== "Identifier") return
+        if (node.callee.name === twin) calledTwin.push(node)
         if (worldBindings.has(node.callee.name) || REACHES_FOR_THE_WORLD.test(node.callee.name)) {
           readsWorld = true
         }
@@ -123,6 +127,9 @@ export const connectedBlockHasPresentationalTwin = {
               data: { block, rendered: entry.name, twin },
             })
           }
+        }
+        for (const call of calledTwin) {
+          context.report({ node: call, messageId: "called", data: { block, twin } })
         }
         if (!rendersTwin) context.report({ node, messageId: "unused", data: { block, twin } })
       },
