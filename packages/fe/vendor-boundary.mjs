@@ -9,6 +9,7 @@ const normalize = (filename) => String(filename || "").replace(/\\/g, "/")
 const componentFile = (filename) => /\/src\/components\//.test(normalize(filename))
 const leafFile = (filename) => /\/src\/components\/leaves\//.test(normalize(filename))
 const mechanicsFile = (filename) => /\/src\/components\/(branches|overlays)\//.test(normalize(filename))
+const classNamesFile = (filename) => /\/src\/components\/.*\/classNames\.tsx?$/.test(normalize(filename))
 
 /** Keep direct Heroicons imports in the Icon leaf. */
 export const noVendorIconOutsideIconLeaf = {
@@ -19,12 +20,12 @@ export const noVendorIconOutsideIconLeaf = {
   },
 }
 
-/** Keep HeroUI mechanics inside leaves and named mechanics branches. */
+/** Keep HeroUI mechanics inside leaves, named mechanics branches, and styling-owner modules. */
 export const vendorPrimitiveHasNamedOwner = {
-  meta: { type: "problem", docs: { description: "HeroUI primitives have a named leaf or mechanics owner." }, schema: [], messages: { owner: "Import HeroUI primitives from a named leaf or mechanics branch." } },
+  meta: { type: "problem", docs: { description: "HeroUI primitives have a named component or styling owner." }, schema: [], messages: { owner: "Import HeroUI primitives from a named leaf, mechanics branch, or colocated classNames module." } },
   create(context) {
     const file = context.filename || context.getFilename()
-    if (!componentFile(file) || leafFile(file) || mechanicsFile(file)) return {}
+    if (!componentFile(file) || leafFile(file) || mechanicsFile(file) || classNamesFile(file)) return {}
     return { ImportDeclaration(node) { if (String(node.source.value) === "@heroui/react") context.report({ node, messageId: "owner" }) } }
   },
 }

@@ -58,7 +58,10 @@ const usesImportedClassName = (node, imported) => {
   if (!node) return false
   if (node.type === "Identifier") return imported.has(node.name) || node.name === "undefined"
   if (isEmptyClassName(node)) return true
-  if (node.type === "CallExpression") return node.callee.type === "Identifier" && imported.has(node.callee.name)
+  if (node.type === "CallExpression") {
+    if (node.callee.type === "Identifier") return imported.has(node.callee.name)
+    return node.callee.type === "MemberExpression" && node.callee.object.type === "Identifier" && imported.has(node.callee.object.name)
+  }
   if (node.type === "MemberExpression") return node.object.type === "Identifier" && imported.has(node.object.name)
   if (node.type === "ConditionalExpression") return usesImportedClassName(node.consequent, imported) && usesImportedClassName(node.alternate, imported)
   if (node.type === "LogicalExpression") {

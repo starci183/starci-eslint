@@ -22,6 +22,7 @@ test("component JSX consumes imported class names", () => {
     valid: [
       { filename: COMPONENT, code: "import { badgeClassName } from './classNames'; const C = () => <div className={badgeClassName} />" },
       { filename: COMPONENT, code: "import { getBadgeClassName } from './classNames'; const C = (props) => <div className={getBadgeClassName(props.tone)} />" },
+      { filename: COMPONENT, code: "import * as badgeClasses from './classNames'; const C = (props) => <div className={badgeClasses.getBadgeClassName(props.tone)} />" },
       { filename: COMPONENT, code: "import { badgeClassNames } from './classNames'; const C = (props) => <div className={badgeClassNames[props.tone]} />" },
       { filename: COMPONENT, code: "import { badgeClassName, getBadgeClassName } from './classNames'; const C = (props) => <div className={props.active ? getBadgeClassName(props.tone) : badgeClassName} />" },
       { filename: COMPONENT, code: "import { badgeClassName } from './classNames'; const C = (props) => <div className={props.active && badgeClassName} />" },
