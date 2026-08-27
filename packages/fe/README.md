@@ -1,92 +1,38 @@
 # @starci/eslint-canon-fe
 
-**74 ESLint rules, from 18 laws, that hold a React front end to one way of being written.**
-
-Not a style pack. These rules enforce *architecture*: which tier a component belongs to, whether
-structure may be typed as a raw class string, where a vendor primitive may be imported, which file
-is allowed to fetch. Prettier decides how code looks; this decides what it is allowed to be.
+The StarCi front-end lint canon for traditional React and TypeScript applications. It keeps
+component ownership, accessibility, loading behavior, vendor boundaries, translations, naming,
+and colocated class-name composition consistent without prescribing a custom rendering protocol.
 
 ```bash
 npm i -D @starci/eslint-canon-fe
 ```
 
-## Use it
-
-One block in `eslint.config.mjs`. It attaches every rule at the severity the canon asks for, and
-makes inline disable comments ineffective rather than merely discouraged.
-
 ```js
-import starciFe, {
-    recommended,
-    linterOptions,
-    starciFeConfig,
-} from "@starci/eslint-canon-fe"
+import starciFe, { recommended, linterOptions, starciFeConfig } from "@starci/eslint-canon-fe"
 
-export default [
-    // …your own ignores, language options and other plugins…
-    starciFeConfig({
-        layout: "single-app",       // or "monorepo"
-        plugin: starciFe,
-        recommended,
-        linterOptions,
-    }),
-]
+export default [starciFeConfig({
+  layout: "single-app",
+  plugin: starciFe,
+  recommended,
+  linterOptions,
+})]
 ```
 
-`layout` is the one thing a repository owns. `single-app` governs `src/**`; `monorepo` governs
-`packages/ui/src/**` and `apps/*/src/**`. **Which globs the law applies to is your fact. What the
-law says is not** — so there is no option to switch a rule off or lower it to a warning.
+The `single-app` layout governs `src/**`; `monorepo` governs shared package and app source trees.
+The package publishes the plugin, recommended levels, repository audits, and layout helper from
+the root entry point.
 
-Prefer to wire it by hand? Every piece is exported: `rules`, `recommended`, `linterOptions`,
-`ruleOwners`, `audits`, `auditOwners`, `lawOwners`.
+## Rules
 
-## What it actually catches
+Rules cover comments, file layout, icons and vendor ownership, landmarks, loading states, naming,
+props, served locales, component splits, design tokens, translations, type safety, typography, and
+class-name ownership. Reusable class names belong in a colocated `classNames.ts` module and should
+be composed with HeroUI `cn` using one utility token per argument.
 
-A sample, not the list:
-
-| Rule | What it stops |
-|---|---|
-| `no-literal-structural-class` | Layout classes typed straight onto an element instead of named in the contract registry |
-| `no-unknown-contract-key` | A structure key that no registry entry declares |
-| `presentational-purity` | A drawing component that fetches, so it can never be rendered from a test |
-| `connected-block-has-presentational-twin` | A block wired to data with no pure half to render |
-| `no-vendor-icon-outside-icon-leaf` | A vendor glyph imported anywhere but the one leaf that wraps it |
-| `no-arbitrary-value` · `no-fractional-step` | Values off the spacing scale, invented per call site |
-| `no-resting-twin-component` | A hand-kept skeleton tree that drifts from the thing it stands in for |
-| `no-inline-lint-config` | A disable comment switching the architecture off for one line |
-| `require-export-jsdoc` | An exported symbol with no stated reason to exist |
-| `no-second-language-in-source` | Copy hardcoded where the translation layer should own it |
-| `no-core-grammar-value-import-outside-adapter` | Core grammar values imported by product code instead of one adapter owner |
-| `surface-branch-requires-contract-render` | A surface used as a JSX children container instead of the contract/render lane |
-| `no-reactnode-escape-slot` | Pre-built ReactNode/JSX escaping a typed component boundary |
-| `runtime-contract-content-requires-component-type` | Runtime props paired with bound content instead of a ComponentType render |
-| `tree-contract-render-identity` | Tree/surface and its render contract claiming different identities |
-| `block-root-is-typed-composition` | A block rooted in an anonymous fragment or structural host element |
-
-Every rule names the law that declares it — `ruleOwners` maps rule name to law, so a failing build
-line leads straight to the document that explains why.
-
-## Why the rules are all errors
-
-Existing debt gets fixed before adoption. Lowering architecture to `warn` teaches every later author
-that the boundary is optional, and a boundary everyone learns is optional is not a boundary. There
-is no staged rollout mode, on purpose.
-
-## Companion
-
-- **[@starci/eslint-canon-be](https://www.npmjs.com/package/@starci/eslint-canon-be)** — the
-  back-end half: 37 rules from 15 laws covering CQRS, exceptions, transport, observability and
-  end-to-end flows.
-
-## Where the laws live
-
-Each rule is the enforceable half of a written law. The prose — why the rule exists, what it
-refuses, which cases sit just outside it — is published openly at
-[starci183/starci-claude-skills](https://github.com/starci183/starci-claude-skills).
-
-A rule that cannot be pointed at in real code is a proposal, not a law. Everything here is
-pointed at.
+Grammar is a business-neutral HeroUI-backed component package. Its components accept ordinary
+typed React props and children.
 
 ## Requirements
 
-ESLint 9+ (flat config), Node 20.9+.
+ESLint 9+ (flat config) and Node.js 20.9+.

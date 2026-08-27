@@ -34,10 +34,8 @@ test("every law in the folder is gathered - a new module cannot be forgotten her
 
 test("repository audits are gathered with the plugin laws", () => {
   assert.equal(typeof audits["effective-config"], "function")
-  assert.equal(typeof audits["effective-config-covers-new-files"], "function")
-  assert.equal(typeof audits["grammar-eslint-version-parity"], "function")
-  assert.equal(typeof audits["rule-readme-count-parity"], "function")
-  assert.equal(typeof audits["reference-receipt-preflight"], "function")
+  assert.equal(audits["effective-config-covers-new-files"], undefined)
+  assert.equal(audits["grammar-eslint-version-parity"], undefined)
 })
 
 /*

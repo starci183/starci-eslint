@@ -13,7 +13,7 @@
  * would leave two names for one rule and no way to tell which a message came from.
  */
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
-import { recommended as contractRecommended, rules as contractRules } from "./contract.mjs"
+import { recommended as classNamesRecommended, rules as classNamesRules } from "./class-names.mjs"
 import { recommended as fileLayoutRecommended, rules as fileLayoutRules } from "./file-layout.mjs"
 import {
   audits as grammarBoundaryAudits,
@@ -46,7 +46,11 @@ import { recommended as vendorRecommended, rules as vendorRules } from "./vendor
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
 const CONTRIBUTIONS = [
   { law: "comments", rules: commentsRules, recommended: commentsRecommended },
-  { law: "contract", rules: contractRules, recommended: contractRecommended },
+  {
+    law: "class-names",
+    rules: classNamesRules,
+    recommended: classNamesRecommended,
+  },
   { law: "file-layout", rules: fileLayoutRules, recommended: fileLayoutRecommended },
   {
     law: "grammar-boundary",

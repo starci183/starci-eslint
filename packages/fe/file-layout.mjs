@@ -22,7 +22,7 @@ const TWO_FILE_TIERS = /\/src\/components\/(pages|layouts)\/([^/]+)\/(.+)$/
 const TWO_FILE_TIERS_WITH_CATEGORY = /\/src\/components\/(overlays)\/[^/]+\/([^/]+)\/(.+)$/
 
 /** The two halves, and the twin test of each, are the whole of what a surface folder may hold. */
-const ALLOWED_IN_SURFACE_FOLDER = /^(?:component|index)(?:\.spec)?\.tsx?$/
+const ALLOWED_IN_SURFACE_FOLDER = /^(?:component|index|classNames)(?:\.spec)?\.tsx?$/
 
 /** Folders that are not component code, whatever they are nested inside. */
 const NON_COMPONENT_FOLDERS = /\/src\/components\/.*\/(constants|utils|types|hooks)\//
@@ -36,7 +36,7 @@ const surfaceFolder = (filename) => {
 
 // -- FILE-2 --------------------------------------------------------------------------------------
 
-/** A page, layout or overlay folder holds its two halves and nothing else. */
+/** A page, layout or overlay folder holds its two halves and its colocated class-name module. */
 export const surfaceFolderTwoFilesOnly = {
   meta: {
     type: "problem",
@@ -44,7 +44,7 @@ export const surfaceFolderTwoFilesOnly = {
     schema: [],
     messages: {
       extra:
-        "`{{tier}}/{{name}}/` contains `{{rest}}` - a surface folder holds its two halves ONLY (`component.tsx` is the shape, `index.tsx` is the wiring). Whatever this is, it has a real home: a component of its own goes to `blocks/<category>/`, a closed arrangement to `composites/`, a fetch to `hooks/`, a pure helper to `modules/utils/`, a shape to `modules/types/`, copy or a config map to `resources/`. \"Only this screen uses it\" is how a folder becomes a second codebase.",
+        "`{{tier}}/{{name}}/` contains `{{rest}}` - a surface folder holds `component.tsx`, `index.tsx`, and an optional `classNames.ts`. Whatever else this is has a real home: a component of its own goes to `blocks/<category>/`, a closed arrangement to `composites/`, a fetch to `hooks/`, a pure helper to `modules/utils/`, a shape to `modules/types/`, copy or a config map to `resources/`.",
     },
   },
   create(context) {
@@ -164,7 +164,7 @@ export const noRuntimeNamespace = {
 const FEATURE_TIERS = /\/packages\/[^/]+\/src\/(blocks|overlays|pages|layouts)\//
 
 /** Tiers that know no feature, and therefore belong to the shared package. */
-const VOCABULARY_TIERS = /\/apps\/[^/]+\/src\/(?:components\/)?(contracts|leaves|composites|branches)\//
+const VOCABULARY_TIERS = /\/apps\/[^/]+\/src\/(?:components\/)?(leaves|composites|branches)\//
 
 /**
  * In a monorepo, the shared package stops below the block.
@@ -183,7 +183,7 @@ export const monorepoTierBelongsToItsSide = {
     type: "problem",
     docs: {
       description:
-        "In a monorepo the shared package holds contracts, leaves, composites and branches; blocks, overlays, layouts and pages belong to the app that owns the feature.",
+        "In a monorepo the shared package holds leaves, composites and branches; blocks, overlays, layouts and pages belong to the app that owns the feature.",
     },
     schema: [],
     messages: {
@@ -316,7 +316,6 @@ export const sourceTierMarkerMatchesFolder = {
       blocks: "block",
       branches: "branch",
       composites: "composite",
-      contracts: "contract",
       layouts: "layout",
       leaves: "leaf",
       overlays: "overlay",
@@ -353,7 +352,7 @@ export const noShellTier = {
     schema: [],
     messages: {
       shell:
-        "`shells/` is an untyped branch exemption. Move the owner to a named branch, replace children with typed contract content, and keep vendor mechanics closed there.",
+        "`shells/` is an untyped branch exemption. Move the owner to a named branch and keep vendor mechanics closed there.",
     },
   },
   create(context) {

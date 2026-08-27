@@ -1,14 +1,12 @@
 {
   "name": "@starci/eslint-canon-fe",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "The StarCi front-end lint canon: every rule its laws publish, gathered as one flat-config plugin.",
   "type": "module",
   "license": "UNLICENSED",
   "private": false,
   "exports": {
-    ".": "./index.mjs",
-    "./contracts": "./contracts.ts",
-    "./props": "./props.ts"
+    ".": "./index.mjs"
   },
   "main": "./index.mjs",
   "files": [

@@ -27,7 +27,7 @@ const tester = new RuleTester({
 })
 
 const LEAF = "D:/repo/src/components/leaves/Text/index.tsx"
-const TABLE = "D:/repo/src/components/contracts/index.ts"
+const CLASS_NAMES = "D:/repo/src/components/leaves/Text/classNames.ts"
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -51,7 +51,7 @@ test("TOKEN-3: a fractional step is off the ladder, wherever it is written", () 
       { filename: LEAF, code: "const CARET = \"size-3.5 shrink-0\"", errors: [{ messageId: "fractional" }] },
       // and an entry's class array
       {
-        filename: TABLE,
+        filename: CLASS_NAMES,
         code: "const C = { x: { classes: [\"flex\", \"py-1.5\"] } }",
         errors: [{ messageId: "fractional" }],
       },
@@ -71,7 +71,7 @@ test("TOKEN-4: an arbitrary value escapes the vocabulary even when it matches it
       { filename: LEAF, code: "const C = \"max-w-[42rem]\"", errors: [{ messageId: "length" }] },
       { filename: LEAF, code: "const C = \"text-[#ff0000]\"", errors: [{ messageId: "colour" }] },
       {
-        filename: TABLE,
+        filename: CLASS_NAMES,
         code: "const C = { x: { classes: [\"flex\", \"gap-[7px]\"] } }",
         errors: [{ messageId: "length" }],
       },

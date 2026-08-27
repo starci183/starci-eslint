@@ -222,8 +222,7 @@ test("FILE-5: each tier sits on its own side of the feature line", () => {
     valid: [
       // The shared package holds the tiers that know no feature.
       { filename: "D:/repo/packages/ui/src/leaves/Badge/index.tsx", code: "export const Badge = () => null" },
-      { filename: "D:/repo/packages/ui/src/contracts/index.ts", code: "export const CONTRACTS = {}" },
-      { filename: "D:/repo/packages/ui/src/branches/Tree/index.tsx", code: "export const Tree = () => null" },
+      { filename: "D:/repo/packages/ui/src/branches/ModalBranch/index.tsx", code: "export const ModalBranch = () => null" },
       // The app holds the tiers that know one.
       { filename: "D:/repo/apps/web/src/components/blocks/fleet/FleetRow/index.tsx", code: "export const FleetRow = () => null" },
       { filename: "D:/repo/apps/web/src/components/pages/FleetPage/component.tsx", code: "export const FleetPageBase = () => null" },
@@ -249,11 +248,6 @@ test("FILE-5: each tier sits on its own side of the feature line", () => {
         code: "export const Badge = () => null",
         errors: [{ messageId: "vocabularyInApp" }],
       },
-      {
-        filename: "D:/repo/apps/web/src/contracts/index.ts",
-        code: "export const CONTRACTS = {}",
-        errors: [{ messageId: "vocabularyInApp" }],
-      },
     ],
   })
 })
@@ -268,7 +262,7 @@ test("FILE-7: the source marker and owning tier agree", () => {
   })
 })
 
-test("FILE-8: shells are branches with typed contracts, not a tier", () => {
+test("FILE-8: shells are not a component tier", () => {
   tester.run("no-shell-tier", noShellTier, {
     valid: [{ filename: `${R}/branches/ModalBranch/index.tsx`, code: "export const ModalBranch = () => null" }],
     invalid: [{ filename: `${R}/shells/ModalShell/index.tsx`, code: "export const ModalShell = () => null", errors: [{ messageId: "shell" }] }],
