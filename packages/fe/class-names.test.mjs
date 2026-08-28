@@ -17,6 +17,15 @@ test("recommended keys use the plugin namespace", async () => {
   assert.deepEqual(Object.keys(recommended), Object.keys(rules).map((name) => `starci-fe/${name}`))
 })
 
+test("reads sourceCode from the ESLint 10 rule context", () => {
+  const listeners = noInlineClassName.create({
+    filename: COMPONENT,
+    sourceCode: { ast: { body: [] } },
+  })
+
+  assert.equal(typeof listeners.JSXAttribute, "function")
+})
+
 test("component JSX consumes imported class names", () => {
   tester.run("no-inline-class-name", noInlineClassName, {
     valid: [

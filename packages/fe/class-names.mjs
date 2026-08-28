@@ -11,7 +11,8 @@ const isCn = (node) => node?.type === "Identifier" && node.name === "cn"
 
 const importedClassNames = (context) => {
   const imports = new Set()
-  for (const statement of context.getSourceCode().ast.body) {
+  const sourceCode = context.sourceCode || context.getSourceCode()
+  for (const statement of sourceCode.ast.body) {
     if (statement.type !== "ImportDeclaration" || statement.source.value !== "./classNames") continue
     for (const specifier of statement.specifiers) imports.add(specifier.local.name)
   }
